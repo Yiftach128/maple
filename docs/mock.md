@@ -153,20 +153,21 @@ request sent on when its response will be rewritten. Everything a protocol does
 differently stays inside those, so nothing else in the package reads a URL or a
 header.
 
-The default codecs are tRPC at `/api/trpc`, then REST. `installMock({ codecs })`
-replaces them, for example with `trpcCodec({ endpoint: "/trpc" })`.
+The default codecs are tRPC at `/api/trpc`, GraphQL at `/graphql`, then REST.
+`installMock({ codecs })` replaces them, for example with
+`trpcCodec({ endpoint: "/trpc" })`.
 
 For each request, the calls the recipe names are answered and the rest keep
 the server's answer:
 
-| State                  | What is sent to the server | What the page gets                            |
-| ---------------------- | -------------------------- | --------------------------------------------- |
-| not named              | the request, as it was     | the server's answer                           |
-| `error`, `forbidden`   | nothing                    | 500 or 403, in the protocol's own error shape |
-| `loading`              | nothing                    | nothing, until the request is abandoned       |
-| `empty`, `one`, `many` | the request, as it was     | the server's own answer, reshaped             |
-| `long`, `sparse`       | the request, as it was     | the server's own answer, reshaped             |
-| `mixed`                | the request, as it was     | the server's own answer, reshaped             |
+| State                  | What is sent to the server | What the page gets                          |
+| ---------------------- | -------------------------- | ------------------------------------------- |
+| not named              | the request, as it was     | the server's answer                         |
+| `error`, `forbidden`   | nothing                    | a failure in the protocol's own error shape |
+| `loading`              | nothing                    | nothing, until the request is abandoned     |
+| `empty`, `one`, `many` | the request, as it was     | the server's own answer, reshaped           |
+| `long`, `sparse`       | the request, as it was     | the server's own answer, reshaped           |
+| `mixed`                | the request, as it was     | the server's own answer, reshaped           |
 
 - **A body state reshapes the live answer**, so the mock is as fresh as the
   page. When the server fails, the last recorded answer is reshaped instead;
@@ -242,6 +243,50 @@ never reaches the interceptor at all. A polyfill that reads the stream over
 `fetch` or `XMLHttpRequest` does, and its events arrive as the server sends them.
 The interceptor cancels its own copy of any body it did not read, since a
 stream copied and left open cannot be closed by the page.
+
+## The GraphQL codec
+
+One request is one operation, keyed by its name: `graphql:GetProjects`. The
+name is the request's `operationName`, else the one named operation in the
+document. An anonymous operation is keyed by a hash of its text with comments,
+commas and whitespace dropped, so the same operation printed two ways is one
+call: `graphql:4b04480d`. Variables are not part of the key. A persisted
+request carrying no text is keyed by its id, APQ's `sha256Hash` or a
+`documentId`, unless `graphqlCodec({ manifest })` holds the host's persisted
+documents, id to text as graphql-codegen's `persistedDocuments` writes them,
+in which case it is named like any other. `readGraphqlOperation` in
+`@maple-kit/core/mock` computes the key, since the route will name the same
+operations when it serves their shapes.
+
+It claims `POST` and `GET` at one endpoint, `/graphql` unless
+`graphqlCodec({ endpoint })` says otherwise, and reads `operationName`,
+`query`, `documentId` and `extensions` from the JSON body or the query string.
+A batch, one array of operations, is not claimed and goes through as it came,
+as does a request that names no operation. Multipart uploads and
+subscriptions over a websocket never reach it.
+
+**The page's own operation runs on the server.** A body state reshapes the
+`data` the server answered, which matches the selection set exactly, so the
+page gets the fields it asked for and nothing else. A response without
+`data`, a persisted-query miss or a validation error, is not an answer: it is
+never recorded, and it goes back as it came, at the server's own status. That
+is how APQ keeps working under a mock: the first request misses, the page
+retries with the text, and both are the same call. Once the call has been
+recorded, a miss is answered from its sample and the page never retries. The
+`errors` beside a partial result are not carried into a rewritten answer.
+
+**A failure is written as a GraphQL server writes one**: `data: null` beside
+one error whose `extensions.code` is `INTERNAL_SERVER_ERROR` or `FORBIDDEN`,
+at HTTP 200. A client reads a 200 with `errors` as the operation failing,
+which is the page's error state; a 500 would be a network error, a different
+path in every client. The content type mirrors the server's,
+`application/graphql-response+json` or `application/json`, and is
+`application/json` when nothing was fetched.
+
+**A mutation is a write, whatever its method.** Every GraphQL request is a
+`POST`, so the call says whether it writes and the report of a write reaching
+the server under `as` believes that over the method. A persisted request
+without a manifest says nothing, and its method decides.
 
 ## Transforms
 
