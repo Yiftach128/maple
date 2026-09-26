@@ -7,6 +7,8 @@
  */
 
 export { activeRecipe, MOCK_HANDLE_KEY } from "./active.js";
+export { readGraphqlOperation } from "./graphql.js";
+export type { GraphqlOperation, GraphqlOperationType, GraphqlParams } from "./graphql.js";
 export { identityRules, isIdentityRules } from "./identity.js";
 export type { CallNeed, IdentityField, IdentityRules, IdentitySource } from "./identity.js";
 export {
