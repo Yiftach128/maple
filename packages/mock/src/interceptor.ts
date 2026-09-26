@@ -13,6 +13,7 @@ import { XMLHttpRequestInterceptor } from "@mswjs/interceptors/XMLHttpRequest";
 import { keptHeaders } from "./codec.js";
 import { flagType, holdStreams } from "./flag-source.js";
 import { seenFlags } from "./flags.js";
+import { graphqlCodec } from "./graphql.js";
 import { installedMock, keepInstalled } from "./handle.js";
 import { knows } from "./identity.js";
 import { createInventory } from "./inventory.js";
@@ -42,7 +43,7 @@ export interface InstallOptions {
   readonly logger?: Logger;
   /** The tab's storage. Defaults to `sessionStorage` when there is one. */
   readonly storage?: Storage;
-  /** Tried in order. Defaults to tRPC at `/api/trpc`, then REST. */
+  /** Tried in order. Defaults to tRPC at `/api/trpc`, GraphQL at `/graphql`, then REST. */
   readonly codecs?: readonly Codec[];
   /** The real `fetch` a mocked request is forwarded through. */
   readonly fetch?: typeof fetch;
@@ -78,7 +79,7 @@ export interface MockHandle {
   dispose(): void;
 }
 
-const CODECS: readonly Codec[] = [trpcCodec(), restCodec];
+const CODECS: readonly Codec[] = [trpcCodec(), graphqlCodec(), restCodec];
 
 /**
  * Wraps `fetch` and `XMLHttpRequest` and applies the active recipe. A second

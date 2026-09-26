@@ -8,6 +8,7 @@
 
 import { bypass, http } from "msw";
 
+import { graphqlCodec } from "../graphql.js";
 import { createInventory } from "../inventory.js";
 import { resolve } from "../resolve.js";
 import { pathPattern, restCodec } from "../rest.js";
@@ -20,7 +21,7 @@ import type { RequestHandler } from "msw";
 
 /** How {@link mockHandlers} resolves. Every field has a working default. */
 export interface MockHandlerOptions {
-  /** Tried in order. Defaults to tRPC at `/api/trpc`, then REST. */
+  /** Tried in order. Defaults to tRPC at `/api/trpc`, GraphQL at `/graphql`, then REST. */
   readonly codecs?: readonly Codec[];
   /** Where real answers are recorded. Defaults to a fresh one in memory. */
   readonly inventory?: Inventory;
@@ -39,7 +40,7 @@ export function mockHandlers(
   options: MockHandlerOptions = {},
 ): RequestHandler[] {
   const inventory = options.inventory ?? createInventory();
-  const codecs = options.codecs ?? [trpcCodec(), restCodec];
+  const codecs = options.codecs ?? [trpcCodec(), graphqlCodec(), restCodec];
   const forward = options.fetch ?? ((request: Request) => fetch(bypass(request)));
   const route =
     options.route ?? (() => pathPattern(typeof location === "undefined" ? "/" : location.pathname));

@@ -36,8 +36,8 @@ result. Nothing in the runtime calls a model.
 | `long`      | Every text as long as the page could really receive, to its `maxLength`.    |
 | `sparse`    | Everything that may be missing, missing.                                    |
 | `mixed`     | Every combination that matters, rather than more items.                     |
-| `error`     | A 500 in the protocol's own error shape.                                    |
-| `forbidden` | A 403 in the protocol's own error shape.                                    |
+| `error`     | A 500 in the protocol's own error shape; GraphQL's `errors` at 200.         |
+| `forbidden` | A 403 in the protocol's own error shape; GraphQL's `FORBIDDEN` at 200.      |
 | `loading`   | Nothing, until the request is abandoned.                                    |
 
 A failure never reaches the server: a write named `error` is answered in the
@@ -66,9 +66,9 @@ if (__MAPLE_PREVIEW__) {
 sentence. Behind a build-time constant, a production build drops the import
 entirely.
 
-It patches `fetch` and `XMLHttpRequest` and reads REST and tRPC, including
-batches, streams and superjson. A call the recipe does not name passes through
-untouched.
+It patches `fetch` and `XMLHttpRequest` and reads REST, tRPC (batches, streams
+and superjson included) and GraphQL (APQ and persisted documents included). A
+call the recipe does not name passes through untouched.
 
 ## The box
 
