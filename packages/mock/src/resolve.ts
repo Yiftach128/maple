@@ -86,7 +86,7 @@ export async function resolve(
   if (taken === undefined) return undefined;
   const layer = identityLayer(active?.as, options.identity);
   const split = layer === undefined ? taken : withNeeds(taken, layer, inventory, options.route);
-  if (layer !== undefined && WRITES.test(request.method)) tellWrites(split, options.onWrite);
+  if (layer !== undefined) tellWrites(split, request.method, options.onWrite);
   const imposed = split.calls.map((call) => call.key === layer?.rules.call);
   const untouched = split.states.every((state) => state === undefined);
   if (untouched && !imposed.includes(true)) return undefined;
@@ -139,11 +139,15 @@ function withNeeds(split: Split, layer: IdentityLayer, inventory: Inventory, rou
   return { ...split, states };
 }
 
-/** A write that reaches the server under `as` still acts as the reviewer: say so. */
-function tellWrites(split: Split, onWrite: ResolveOptions["onWrite"]): void {
+/**
+ * A write that reaches the server under `as` still acts as the reviewer: say
+ * so. A call that says whether it writes is believed over the method.
+ */
+function tellWrites(split: Split, method: string, onWrite: ResolveOptions["onWrite"]): void {
   split.calls.forEach((call, index) => {
     const state = split.states[index];
-    if (state === undefined || BODY_STATES.has(state)) onWrite?.(call.key);
+    const writes = call.mutates ?? WRITES.test(method);
+    if (writes && (state === undefined || BODY_STATES.has(state))) onWrite?.(call.key);
   });
 }
 

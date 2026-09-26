@@ -9,7 +9,7 @@ import { RULES } from "./msw/identity.js";
 import { createTestServer, useTestServer } from "./msw/server.js";
 
 import type { MockState, Recipe } from "@maple-kit/core/mock";
-import type { Inventory } from "@maple-kit/mock";
+import type { Codec, Inventory } from "@maple-kit/mock";
 
 const api = createApiFake();
 const server = createTestServer(...api.handlers);
@@ -340,6 +340,30 @@ describe("resolve, under `as`", () => {
     expect(response).toBeUndefined();
     expect(writes).toEqual(["rest:POST /api/projects"]);
   });
+
+  it.each([
+    ["reads", "POST", false, []],
+    ["writes", "GET", true, ["rest:GET /api/projects"]],
+  ] as const)(
+    "believes a call that says it %s over the method",
+    async (_, method, mutates, expected) => {
+      const said: Codec = {
+        ...restCodec,
+        split: async (request) =>
+          (await restCodec.split(request))?.map((call) => ({ ...call, mutates })),
+      };
+      const writes: string[] = [];
+      const init = method === "POST" ? { method, body: "{}" } : { method };
+      const response = await resolve(
+        new Request(`${API}/projects`, init),
+        shownAs({ role: "barista" }),
+        createInventory(),
+        { ...options, codecs: [said], identity: RULES, onWrite: (key) => writes.push(key) },
+      );
+      expect(response).toBeUndefined();
+      expect(writes).toEqual(expected);
+    },
+  );
 
   it("changes nothing without identity rules", async () => {
     const response = await resolve(

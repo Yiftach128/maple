@@ -12,6 +12,11 @@ import type { TypeMeta } from "./superjson.js";
 export interface Call {
   /** The stable key a recipe names it by, prefixed with the codec's name. */
   readonly key: string;
+  /**
+   * Whether the call writes, when the protocol says so: a GraphQL mutation
+   * is one over any method. Absent, the HTTP method decides.
+   */
+  readonly mutates?: boolean;
 }
 
 /**
