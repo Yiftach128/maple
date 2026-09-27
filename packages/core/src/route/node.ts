@@ -31,8 +31,14 @@ export function toNodeMiddleware(
       return;
     }
 
-    void serve(handle, request, response);
+    // A rejection here would be unhandled, and Node exits on one.
+    serve(handle, request, response).catch(() => fail(response));
   };
+}
+
+function fail(response: ServerResponse): void {
+  if (!response.headersSent) response.statusCode = 500;
+  response.end();
 }
 
 async function serve(
@@ -50,8 +56,9 @@ async function serve(
 }
 
 async function toWebRequest(request: IncomingMessage): Promise<Request> {
-  const host = header(request, "host") ?? "localhost";
-  const url = `http://${host}${request.url ?? "/"}`;
+  // HTTP/2 names the host `:authority` and may send no `host` at all.
+  const host = header(request, "host") ?? header(request, ":authority") ?? "localhost";
+  const url = `${scheme(request)}://${host}${request.url ?? "/"}`;
   const method = request.method ?? "GET";
   const empty = method === "GET" || method === "HEAD";
   const body = empty ? undefined : await readBody(request);
@@ -66,10 +73,18 @@ async function toWebRequest(request: IncomingMessage): Promise<Request> {
 function toHeaders(request: IncomingMessage): Headers {
   const headers = new Headers();
   for (const [name, value] of Object.entries(request.headers)) {
+    // HTTP/2 pseudo-headers (`:method`, `:path`, ...) are not header names,
+    // and `Headers` throws on them.
+    if (name.startsWith(":")) continue;
     if (typeof value === "string") headers.set(name, value);
     else if (Array.isArray(value)) for (const one of value) headers.append(name, one);
   }
   return headers;
+}
+
+/** HTTP/2 says which scheme it came in on; HTTP/1 does not, so it stays `http`. */
+function scheme(request: IncomingMessage): "http" | "https" {
+  return header(request, ":scheme") === "https" ? "https" : "http";
 }
 
 function header(request: IncomingMessage, name: string): string | undefined {
