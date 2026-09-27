@@ -83,7 +83,9 @@ async function loadSources(): Promise<Sources> {
 function markdownFiles(): string[] {
   // eslint-disable-next-line sonarjs/no-os-command-from-path -- git is whichever one the hook or CI runs.
   const out = execFileSync("git", ["ls-files", "-z", "*.md"], { cwd: ROOT, encoding: "utf8" });
-  return out.split("\0").filter((file) => file !== "");
+  return out
+    .split("\0")
+    .filter((file) => file !== "" && existsSync(fileURLToPath(new URL(file, ROOT))));
 }
 
 type Sections = typeof import("./sections.js");

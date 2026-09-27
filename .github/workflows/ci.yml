@@ -119,6 +119,17 @@ jobs:
           fi
           echo "No URLs in pnpm-lock.yaml."
 
+  doc-guards:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+      - name: No stale version pin, no paragraph repeated in a file
+        # Node builtins only, so no install.
+        run: node tools/doc-guards/check.ts
+
   gitleaks:
     runs-on: ubuntu-latest
     steps:

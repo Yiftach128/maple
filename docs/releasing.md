@@ -5,6 +5,13 @@ opens a "chore: version packages" pull request; merging it publishes what it
 versioned. npm authenticates the workflow by OIDC, as a trusted publisher, so
 no publish credential is stored anywhere.
 
+The version pull request also runs `pnpm docs:sync-versions`. Every version
+pinned in the docs moves to the new one, as does the plugin's `@maple-kit/mcp`
+pin in `plugins/maple/.mcp.json`, and when the plugin changed its
+`plugin.json` version gets a patch bump, because an installed plugin updates
+only when that version does. CI's stale-version guard compares against
+`package.json`, so it passes on that pull request and on every one after.
+
 ## A new package name
 
 npm registers a trusted publisher only against a package that already exists,

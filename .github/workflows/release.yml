@@ -41,9 +41,13 @@ jobs:
         #
         # `pnpm build` is explicit because ignore-scripts=true means a prepack
         # would never fire: nothing else rebuilds dist before it is packed.
+        #
+        # docs:sync-versions moves every version pin in the docs, the plugin's
+        # MCP pin and the plugin version in the same pull request, so the
+        # stale-version guard in CI never fails on the release that follows.
         uses: changesets/action@v1
         with:
-          version: pnpm changeset version
+          version: pnpm changeset version && pnpm docs:sync-versions
           publish: pnpm release
           title: "chore: version packages"
           # A block scalar, so the trailer survives into the commit message.
