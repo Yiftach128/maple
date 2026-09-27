@@ -144,3 +144,21 @@ jobs:
             echo "Sign your commits with 'git commit -s'. See CONTRIBUTING.md."
             exit 1
           fi
+
+  changeset-level:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # The check diffs against the merge base, which a shallow clone lacks.
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+      - name: Docs-only changes ship no changeset
+        # Node builtins only, so no install: README, skill and docs changes
+        # never trigger a release, and never a minor one.
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: node tools/changeset-level/check.ts --base "$BASE"

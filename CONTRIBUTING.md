@@ -175,6 +175,11 @@ pnpm changeset
 Pick the packages, pick the bump, and write the line a user will read in the
 release notes — not the commit summary.
 
+A change to documentation alone — Markdown, `docs/`, a skill — ships no
+changeset, and a changeset may not bump a package minor or major for a change
+that touched only that package's docs. `pnpm check:changeset-level` checks both
+against `origin/main`, as CI does against the pull request's base.
+
 ## Reporting a security issue
 
 Do not open an issue. See [SECURITY.md](SECURITY.md).

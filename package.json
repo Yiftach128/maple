@@ -20,6 +20,7 @@
     "attw": "pnpm -r --filter \"./packages/*\" exec attw --pack . --profile esm-only",
     "build": "pnpm -r --filter \"./packages/*\" build",
     "changeset": "changeset",
+    "check:changeset-level": "node tools/changeset-level/check.ts",
     "check:skill-links": "node tools/skill-links/check.ts",
     "check": "pnpm lint && pnpm typecheck && pnpm test",
     "demo:record": "node tools/demo-recorder/record.ts && tools/demo-recorder/encode.sh",
