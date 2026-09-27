@@ -1,12 +1,13 @@
-import { isSet, parseArgs } from "./args.js";
+import { ArgsError, describeFlags, GLOBAL_FLAGS, isSet, parseArgs } from "./args.js";
 import { connectorKindRows, renderConnectorKinds } from "./commands/connectors.js";
-import { MOCK_PLAN_USAGE, mockPlan } from "./commands/mock-plan.js";
-import { MOCK_SCHEMA_USAGE, mockSchema } from "./commands/mock-schema.js";
-import { SETUP_APP_USAGE, setupApp } from "./commands/setup-app.js";
-import { SETUP_CI_USAGE, setupCi } from "./commands/setup-ci.js";
-import { SETUP_VERIFY_USAGE, setupVerify } from "./commands/setup-verify.js";
+import { MOCK_PLAN_FLAGS, MOCK_PLAN_USAGE, mockPlan } from "./commands/mock-plan.js";
+import { MOCK_SCHEMA_FLAGS, MOCK_SCHEMA_USAGE, mockSchema } from "./commands/mock-schema.js";
+import { SETUP_APP_FLAGS, SETUP_APP_USAGE, setupApp } from "./commands/setup-app.js";
+import { SETUP_CI_FLAGS, SETUP_CI_USAGE, setupCi } from "./commands/setup-ci.js";
+import { SETUP_VERIFY_FLAGS, SETUP_VERIFY_USAGE, setupVerify } from "./commands/setup-verify.js";
 import { HELP } from "./help.js";
 
+import type { FlagSpec, ParsedArgs } from "./args.js";
 import type { Generate } from "./commands/mock-schema.js";
 import type { WorkflowFs } from "./commands/setup-ci.js";
 
@@ -30,6 +31,50 @@ export interface RunResult {
   readonly exitCode: number;
 }
 
+/** One command: the flags it accepts beyond the global ones, and what it does. */
+interface Command {
+  readonly flags: FlagSpec;
+  readonly run: (args: ParsedArgs, options: RunOptions) => Promise<RunResult> | RunResult;
+}
+
+/** Every command, by the words that name it. */
+export const COMMANDS: Readonly<Record<string, Command>> = {
+  connectors: {
+    flags: {},
+    run: ({ flags }) => {
+      const rows = connectorKindRows();
+      return present(isSet(flags, "json"), rows, renderConnectorKinds(rows));
+    },
+  },
+  "mock schema": {
+    flags: MOCK_SCHEMA_FLAGS,
+    run: (args, options) => mockSchema(args, options.generate),
+  },
+  "mock plan": { flags: MOCK_PLAN_FLAGS, run: (args, options) => mockPlan(args, options.fetch) },
+  "setup app": {
+    flags: SETUP_APP_FLAGS,
+    run: ({ flags }) => setupApp(flags, isSet(flags, "json")),
+  },
+  "setup verify": {
+    flags: SETUP_VERIFY_FLAGS,
+    run: ({ flags }, options) => setupVerify(flags, options.fetch),
+  },
+  "setup ci": { flags: SETUP_CI_FLAGS, run: ({ flags }, options) => setupCi(flags, pick(options)) },
+};
+
+/** What a command group prints when its subcommand is missing or unknown. */
+const GROUP_USAGE: Readonly<Record<string, string>> = {
+  mock: `${MOCK_SCHEMA_USAGE}\n\n${MOCK_PLAN_USAGE}`,
+  setup: `${SETUP_APP_USAGE}\n\n${SETUP_VERIFY_USAGE}\n\n${SETUP_CI_USAGE}`,
+};
+
+/** Every flag any command declares, so the first pass finds positionals wherever flags sit. */
+const ANY_FLAG: FlagSpec = Object.fromEntries(
+  [GLOBAL_FLAGS, ...Object.values(COMMANDS).map((command) => command.flags)].flatMap((spec) =>
+    Object.entries(spec),
+  ),
+);
+
 /** Serialises `value` for `--json`, or renders it for a terminal. */
 function present(json: boolean, value: unknown, text: string): RunResult {
   return { output: json ? JSON.stringify(value, null, 2) : text, exitCode: 0 };
@@ -42,54 +87,33 @@ function present(json: boolean, value: unknown, text: string): RunResult {
  * which is what makes every command testable as a plain function.
  */
 export async function run(argv: readonly string[], options: RunOptions): Promise<RunResult> {
-  const { command, flags, positionals } = parseArgs(argv);
-  const json = isSet(flags, "json");
+  const { command, flags, positionals } = parseArgs(argv, ANY_FLAG, { strict: false });
 
   if (isSet(flags, "version")) return { output: options.version, exitCode: 0 };
   if (isSet(flags, "help") || command === undefined) return { output: HELP, exitCode: 0 };
 
-  if (command === "mock") return mock({ flags, positionals }, options);
-  if (command === "setup") return setup({ flags, positionals }, options);
-
-  if (command === "connectors") {
-    const rows = connectorKindRows();
-    return present(json, rows, renderConnectorKinds(rows));
+  const group = GROUP_USAGE[command];
+  const name = group === undefined ? command : `${command} ${positionals[0] ?? ""}`;
+  const found = COMMANDS[name];
+  if (found === undefined) {
+    if (group !== undefined) return { output: group, exitCode: 1 };
+    return { output: `Unknown command "${command}".\n\n${HELP}`, exitCode: 1 };
   }
 
-  return {
-    output: `Unknown command "${command}".\n\n${HELP}`,
-    exitCode: 1,
-  };
-}
-
-/** `maple mock schema` and `maple mock plan`, by their first positional. */
-function mock(
-  args: { flags: RunResultFlags; positionals: readonly string[] },
-  options: RunOptions,
-): Promise<RunResult> {
-  const [subcommand] = args.positionals;
-  if (subcommand === "schema") return mockSchema(args, options.generate);
-  if (subcommand === "plan") return mockPlan(args, options.fetch);
-  return Promise.resolve({ output: `${MOCK_SCHEMA_USAGE}\n\n${MOCK_PLAN_USAGE}`, exitCode: 1 });
-}
-
-const SETUP_USAGE = `${SETUP_APP_USAGE}\n\n${SETUP_VERIFY_USAGE}\n\n${SETUP_CI_USAGE}`;
-
-/** `maple setup app`, `verify` and `ci`, by their first positional. */
-async function setup(
-  args: { flags: RunResultFlags; positionals: readonly string[] },
-  options: RunOptions,
-): Promise<RunResult> {
-  const [subcommand] = args.positionals;
-  const json = isSet(args.flags, "json");
-  if (subcommand === "app") return setupApp(args.flags, json);
-  if (subcommand === "verify") return setupVerify(args.flags, options.fetch);
-  if (subcommand === "ci") return setupCi(args.flags, pick(options));
-  return { output: SETUP_USAGE, exitCode: 1 };
+  const spec = { ...found.flags, ...GLOBAL_FLAGS };
+  let args: ParsedArgs;
+  try {
+    args = parseArgs(argv, spec);
+  } catch (error) {
+    if (!(error instanceof ArgsError)) throw error;
+    return {
+      output: `maple ${name}: ${error.message}\nIts flags: ${describeFlags(spec)}`,
+      exitCode: 1,
+    };
+  }
+  return found.run(args, options);
 }
 
 function pick({ cwd, fs }: RunOptions): { cwd?: string; fs?: WorkflowFs } {
   return { ...(cwd === undefined ? {} : { cwd }), ...(fs === undefined ? {} : { fs }) };
 }
-
-type RunResultFlags = ReturnType<typeof parseArgs>["flags"];

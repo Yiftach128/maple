@@ -60,6 +60,15 @@ describe("maple setup verify", () => {
     expect(result.output).toContain("Could not reach GitHub");
   });
 
+  it("reads --client-id <value> the same as --client-id=<value>", async () => {
+    const result = await run(["setup", "verify", "--client-id", FLOW_ON], { version: "0" });
+
+    expect(result.exitCode).toBe(0);
+    expect(fake.asked).toEqual([
+      { accept: "application/json", form: { client_id: FLOW_ON, scope: "" } },
+    ]);
+  });
+
   it("prints its usage and asks nothing without a client id", async () => {
     const result = await run(["setup", "verify"], { version: "0" });
 

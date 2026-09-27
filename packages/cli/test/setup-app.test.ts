@@ -115,7 +115,11 @@ describe("maple setup app", () => {
     expect(parsed.permissions).toEqual({ pull_requests: "write" });
   });
 
-  it.each([[[]], [["--owner"]], [["--owner=acme/web"]]])(
+  it.each([["--owner", "acme"], ["--owner=acme"]])("reads the owner from %j", async (...flags) => {
+    expect((await app(...flags)).output).toContain("/organizations/acme/");
+  });
+
+  it.each([[[]], [["--owner="]], [["--owner=acme/web"]]])(
     "prints its usage for %j",
     async (flags) => {
       expect(await app(...flags)).toEqual({ output: SETUP_APP_USAGE, exitCode: 1 });

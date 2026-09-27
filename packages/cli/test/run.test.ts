@@ -1,8 +1,9 @@
 import { CONNECTOR_METHODS } from "@maple-kit/core";
 import { describe, expect, it } from "vitest";
 
+import { describeFlags, GLOBAL_FLAGS } from "../src/args.js";
 import { HELP } from "../src/help.js";
-import { run } from "../src/run.js";
+import { COMMANDS, run } from "../src/run.js";
 
 const OPTIONS = { version: "1.2.3" };
 
@@ -64,5 +65,81 @@ describe("run", () => {
       const methods = CONNECTOR_METHODS[row.kind as keyof typeof CONNECTOR_METHODS];
       expect(new Set([...row.required, ...row.optional])).toEqual(new Set(methods));
     }
+  });
+});
+
+const NAMES = Object.keys(COMMANDS);
+
+/** Every `[command, flag]` pair whose flag has `type`, the global ones included. */
+function flagsOfType(type: string): (readonly [string, string])[] {
+  return Object.entries(COMMANDS).flatMap(([name, { flags }]) =>
+    Object.entries({ ...GLOBAL_FLAGS, ...flags })
+      .filter(([, declared]) => declared === type)
+      .map(([flag]) => [name, flag] as const),
+  );
+}
+
+describe("every command's flags", () => {
+  it.each(NAMES)("maple %s refuses an unknown flag and names the ones it takes", async (name) => {
+    const result = await run([...name.split(" "), "--bogus"], OPTIONS);
+    const spec = { ...COMMANDS[name]?.flags, ...GLOBAL_FLAGS };
+
+    expect(result).toEqual({
+      output: `maple ${name}: Unknown option '--bogus'.\nIts flags: ${describeFlags(spec)}`,
+      exitCode: 1,
+    });
+  });
+
+  it.each(flagsOfType("string"))("maple %s refuses --%s with no value", async (name, flag) => {
+    const result = await run([...name.split(" "), `--${flag}`], OPTIONS);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain(`maple ${name}: Option '--${flag} <value>' argument missing.`);
+  });
+
+  it.each(flagsOfType("boolean"))("maple %s refuses a value for --%s", async (name, flag) => {
+    const result = await run([...name.split(" "), `--${flag}=yes`], OPTIONS);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain(`Option '--${flag}' does not take an argument.`);
+  });
+
+  it("lists a command's own flags first, marking those that take a value", async () => {
+    const { output } = await run(["setup", "app", "--ownr", "acme"], OPTIONS);
+
+    expect(output).toContain(
+      "Its flags: --owner <value>, --name <value>, --personal, --gate, --json, --help, --version",
+    );
+  });
+
+  it("refuses a flag only another command takes", async () => {
+    const result = await run(["setup", "ci", "--owner=acme"], OPTIONS);
+
+    expect(result.output).toContain("maple setup ci: Unknown option '--owner'.");
+  });
+
+  it("gives a flag one type wherever two commands share its name", () => {
+    const seen = new Map<string, string>(Object.entries(GLOBAL_FLAGS));
+    for (const { flags } of Object.values(COMMANDS)) {
+      for (const [flag, type] of Object.entries(flags)) {
+        expect(seen.get(flag) ?? type).toBe(type);
+        seen.set(flag, type);
+      }
+    }
+  });
+
+  it.each([
+    [["setup", "app", "--gate", "--owner", "acme"]],
+    [["--owner", "acme", "setup", "app", "--gate"]],
+    [["setup", "--gate", "app", "--owner=acme"]],
+  ])("finds the command wherever the flags sit in %j", async (argv) => {
+    const result = await run(argv, OPTIONS);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toContain("Register the gate App");
+  });
+
+  it("answers --help before checking flags", async () => {
+    expect((await run(["setup", "app", "--bogus", "--help"], OPTIONS)).output).toBe(HELP);
   });
 });

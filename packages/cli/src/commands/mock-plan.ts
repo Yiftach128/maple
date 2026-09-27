@@ -6,7 +6,7 @@
 
 import { parseRecipe, readPlan, RECIPE_VERSION } from "@maple-kit/core/mock";
 
-import type { ParsedArgs } from "../args.js";
+import type { FlagSpec, ParsedArgs } from "../args.js";
 import type { MockPlan } from "@maple-kit/core/connectors";
 import type { Recipe } from "@maple-kit/core/mock";
 
@@ -15,6 +15,12 @@ export interface MockPlanResult {
   readonly output: string;
   readonly exitCode: number;
 }
+
+export const MOCK_PLAN_FLAGS = {
+  url: "string",
+  route: "string",
+  calls: "string",
+} as const satisfies FlagSpec;
 
 export const MOCK_PLAN_USAGE = `Usage
   maple mock plan "<sentence>" --url=<route> --route=<pattern> --calls=<key>,<key>

@@ -7,7 +7,7 @@
 
 import { isSet } from "../args.js";
 
-import type { ParsedArgs } from "../args.js";
+import type { FlagSpec, ParsedArgs } from "../args.js";
 
 /**
  * The repository permissions each of Maple's two GitHub Apps is registered
@@ -38,6 +38,13 @@ export interface SetupAppResult {
   readonly output: string;
   readonly exitCode: number;
 }
+
+export const SETUP_APP_FLAGS = {
+  owner: "string",
+  name: "string",
+  personal: "boolean",
+  gate: "boolean",
+} as const satisfies FlagSpec;
 
 export const SETUP_APP_USAGE = `Usage
   maple setup app --owner=<org-or-user> [--personal] [--gate] [--name=<name>] [--json]

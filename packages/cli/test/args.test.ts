@@ -1,59 +1,101 @@
 import { describe, expect, it } from "vitest";
 
-import { isSet, parseArgs } from "../src/args.js";
+import { ArgsError, describeFlags, isSet, parseArgs } from "../src/args.js";
+
+import type { FlagSpec, ParsedArgs } from "../src/args.js";
+
+const SPEC = { branch: "string", filter: "string", json: "boolean" } as const satisfies FlagSpec;
 
 describe("parseArgs", () => {
-  it("returns no command for an empty argv", () => {
-    expect(parseArgs([])).toEqual({ positionals: [], flags: {} });
+  it.each<[string, string[], ParsedArgs]>([
+    ["nothing", [], { positionals: [], flags: {} }],
+    ["a command", ["connectors"], { command: "connectors", positionals: [], flags: {} }],
+    [
+      "later positionals, in order",
+      ["list", "main", "c_1"],
+      { command: "list", positionals: ["main", "c_1"], flags: {} },
+    ],
+    ["a boolean flag", ["--json"], { positionals: [], flags: { json: true } }],
+    ["--flag=value", ["--branch=feature/x"], { positionals: [], flags: { branch: "feature/x" } }],
+    [
+      "--flag value",
+      ["--branch", "feature/x"],
+      { positionals: [], flags: { branch: "feature/x" } },
+    ],
+    [
+      "a value before a positional",
+      ["list", "--branch", "a", "b"],
+      { command: "list", positionals: ["b"], flags: { branch: "a" } },
+    ],
+    [
+      "equals signs inside a value",
+      ["--filter=a=b"],
+      { positionals: [], flags: { filter: "a=b" } },
+    ],
+    ["an empty value", ["--branch="], { positionals: [], flags: { branch: "" } }],
+    [
+      "a dash-led value after equals",
+      ["--branch=-x"],
+      { positionals: [], flags: { branch: "-x" } },
+    ],
+    [
+      "the later of two values",
+      ["--branch=a", "--branch", "b"],
+      { positionals: [], flags: { branch: "b" } },
+    ],
+    ["a lone dash as a positional", ["-"], { command: "-", positionals: [], flags: {} }],
+    [
+      "anything after -- as a positional",
+      ["x", "--", "--json"],
+      { command: "x", positionals: ["--json"], flags: {} },
+    ],
+  ])("reads %s", (_, argv, expected) => {
+    expect(parseArgs(argv, SPEC)).toEqual(expected);
   });
 
-  it("takes the first positional as the command", () => {
-    expect(parseArgs(["connectors"]).command).toBe("connectors");
+  it.each<[string, string[], string]>([
+    ["an unknown flag", ["--brnch=a"], "Unknown option '--brnch'."],
+    ["an unknown short flag", ["-j"], "Unknown option '-j'."],
+    [
+      "a string flag at the end with no value",
+      ["--branch"],
+      "Option '--branch <value>' argument missing.",
+    ],
+    [
+      "a string flag followed by another flag",
+      ["--branch", "--json"],
+      "Option '--branch' argument is ambiguous.",
+    ],
+    [
+      "a value given to a boolean flag",
+      ["--json=false"],
+      "Option '--json' does not take an argument.",
+    ],
+  ])("refuses %s", (_, argv, message) => {
+    expect(() => parseArgs(argv, SPEC)).toThrow(new ArgsError(message));
   });
 
-  it("keeps later positionals in order", () => {
-    expect(parseArgs(["list", "main", "c_1"]).positionals).toEqual(["main", "c_1"]);
+  it("reads an undeclared flag as boolean, and throws nothing, when not strict", () => {
+    expect(parseArgs(["--nope", "x", "--branch", "a"], SPEC, { strict: false })).toEqual({
+      command: "x",
+      positionals: [],
+      flags: { nope: true, branch: "a" },
+    });
   });
+});
 
-  it("records a bare flag as true", () => {
-    expect(parseArgs(["--json"]).flags).toEqual({ json: true });
-  });
-
-  it("splits --name=value", () => {
-    expect(parseArgs(["--branch=feature/x"]).flags).toEqual({ branch: "feature/x" });
-  });
-
-  it("keeps equals signs inside a value", () => {
-    expect(parseArgs(["--filter=a=b"]).flags["filter"]).toBe("a=b");
-  });
-
-  it("accepts an empty value", () => {
-    expect(parseArgs(["--branch="]).flags["branch"]).toBe("");
-  });
-
-  it("lets a later flag win over an earlier one", () => {
-    expect(parseArgs(["--branch=a", "--branch=b"]).flags["branch"]).toBe("b");
-  });
-
-  it("does not treat a lone dash as a flag", () => {
-    expect(parseArgs(["-"]).command).toBe("-");
+describe("describeFlags", () => {
+  it("marks the flags that take a value", () => {
+    expect(describeFlags(SPEC)).toBe("--branch <value>, --filter <value>, --json");
   });
 });
 
 describe("isSet", () => {
-  it("is true for a bare flag", () => {
-    expect(isSet({ json: true }, "json")).toBe(true);
-  });
-
-  it("is true for any value other than the string false", () => {
-    expect(isSet({ json: "yes" }, "json")).toBe(true);
-  });
-
-  it("is false for --json=false", () => {
-    expect(isSet({ json: "false" }, "json")).toBe(false);
-  });
-
-  it("is false for a flag that was not given", () => {
-    expect(isSet({}, "json")).toBe(false);
+  it.each<[ParsedArgs["flags"], boolean]>([
+    [{ json: true }, true],
+    [{}, false],
+    [{ json: "yes" }, false],
+  ])("reads %j as %s", (flags, expected) => {
+    expect(isSet(flags, "json")).toBe(expected);
   });
 });

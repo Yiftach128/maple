@@ -9,7 +9,7 @@ import { dirname, join } from "node:path";
 
 import { isSet } from "../args.js";
 
-import type { ParsedArgs } from "../args.js";
+import type { FlagSpec, ParsedArgs } from "../args.js";
 
 /** What the command prints, and its exit code. */
 export interface SetupCiResult {
@@ -29,6 +29,11 @@ export const WORKFLOW_PATH = ".github/workflows/maple.yml";
 /** The check the gate publishes, and the App `github.token` acts as. */
 export const CHECK_NAME = "maple/visual-review";
 export const GITHUB_ACTIONS_APP_ID = 15368;
+
+export const SETUP_CI_FLAGS = {
+  "require-approval": "boolean",
+  write: "boolean",
+} as const satisfies FlagSpec;
 
 export const SETUP_CI_USAGE = `Usage
   maple setup ci [--require-approval] [--write]

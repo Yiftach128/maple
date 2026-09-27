@@ -12,7 +12,7 @@ import { dirname, resolve } from "node:path";
 
 import { MOCK_EXTENSION } from "@maple-kit/core/mock";
 
-import type { ParsedArgs } from "../args.js";
+import type { FlagSpec, ParsedArgs } from "../args.js";
 
 /** What the command prints, and its exit code. */
 export interface MockSchemaResult {
@@ -29,6 +29,12 @@ export type Generate = (
 /** The peer this command needs, named so its absence can be said plainly. */
 export const GENERATOR = "@trpc/openapi";
 const GENERATOR_VERSION = "11.19.0-alpha";
+
+export const MOCK_SCHEMA_FLAGS = {
+  export: "string",
+  out: "string",
+  superjson: "boolean",
+} as const satisfies FlagSpec;
 
 export const MOCK_SCHEMA_USAGE = `Usage
   maple mock schema <router.ts> [--export=AppRouter] [--out=file.json] [--superjson]

@@ -57,6 +57,17 @@ describe("maple mock plan", () => {
     ]);
   });
 
+  it("reads --flag value the same as --flag=value", async () => {
+    fake.answerNext(planOf({ empty: 0.8 }, [LIST]));
+    const argv = ["mock", "plan", "--url", ROUTE_URL, "no roasts yet", "--route", "/roasts"];
+    const result = await run([...argv, "--calls", LIST, "--json"], { version: "0" });
+
+    expect(result.exitCode).toBe(0);
+    expect(fake.asked).toEqual([
+      { request: "no roasts yet", route: "/roasts", calls: [{ key: LIST, summary: "" }] },
+    ]);
+  });
+
   it("takes the first of two tied states, as the box's first chip", async () => {
     fake.answerNext(planOf({ empty: 0.45, error: 0.35 }, [LIST]));
     const result = await plan("no roasts or broken");

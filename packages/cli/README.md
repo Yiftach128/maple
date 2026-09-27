@@ -10,7 +10,9 @@ review comments on deployed previews, written for people and read by agents.
 </p>
 
 Every command that prints a table also takes `--json`, so an agent drives it
-from a terminal as easily as a person does.
+from a terminal as easily as a person does. A flag's value can follow it
+(`--owner acme`) or be joined to it (`--owner=acme`), and a flag the command
+does not take is an error that lists the ones it does.
 
 ## Install
 

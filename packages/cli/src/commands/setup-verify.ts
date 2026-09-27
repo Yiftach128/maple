@@ -4,13 +4,15 @@
  * found by the person who registered it rather than by the first reviewer.
  */
 
-import type { ParsedArgs } from "../args.js";
+import type { FlagSpec, ParsedArgs } from "../args.js";
 
 /** What the command prints, and its exit code. */
 export interface SetupVerifyResult {
   readonly output: string;
   readonly exitCode: number;
 }
+
+export const SETUP_VERIFY_FLAGS = { "client-id": "string" } as const satisfies FlagSpec;
 
 export const SETUP_VERIFY_USAGE = `Usage
   maple setup verify --client-id=<Iv…>
