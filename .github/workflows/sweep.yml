@@ -1,0 +1,167 @@
+name: Weekly sweep
+
+# Drift that lands outside any pull request: pins behind the latest release,
+# layer-1 checks over the whole tree, and jev over every doc. One issue,
+# labelled `sweep`, holds the findings; each run rewrites it and closes it when
+# nothing is found. Pins in this repository move in one bump pull request.
+on:
+  schedule:
+    - cron: "23 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      days:
+        description: How many days of commits the plugin-version and jev passes read
+        default: "8"
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions: {}
+
+env:
+  # A week and a day, so a late or skipped run leaves no gap between windows.
+  SINCE: ${{ format('{0} days ago', inputs.days || '8') }}
+  SWEEP_DIR: ${{ github.workspace }}/../sweep
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      bump: ${{ steps.sweep.outputs.bump }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # The window's first commit and each changeset's commit are in history.
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+      - run: mkdir -p "$SWEEP_DIR"
+      - name: Read maple-action's manifest
+        # Public, so this token reads it; it cannot write there. A failure is
+        # recorded in the issue rather than failing the sweep.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/maple-kit/maple-action/contents/package.json \
+            -H "Accept: application/vnd.github.raw" > "$SWEEP_DIR/maple-action.json" \
+            || rm -f "$SWEEP_DIR/maple-action.json"
+      - name: jev over every doc the window's code reaches
+        # Without the key it writes a summary that says it skipped, and exits 0.
+        env:
+          TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
+        run: node tools/doc-drift/sweep.ts --since "$SINCE" --out "$SWEEP_DIR/drift.json"
+      - name: Pins, layer 1 over the whole tree, and the diff-reading checks
+        id: sweep
+        run: >-
+          node tools/sweep/run.ts --since "$SINCE" --out "$SWEEP_DIR/sweep.json"
+          --action-manifest "$SWEEP_DIR/maple-action.json" --drift "$SWEEP_DIR/drift.json"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sweep
+          path: ${{ env.SWEEP_DIR }}/sweep.json
+          retention-days: 30
+
+  bump:
+    needs: sweep
+    if: needs.sweep.outputs.bump == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # the bump branch
+      pull-requests: write # the one bump pull request
+    outputs:
+      pr: ${{ steps.pr.outputs.url }}
+    env:
+      BRANCH: sweep/pin-latest
+      # A pull request opened with GITHUB_TOKEN starts no workflow, so CI would
+      # not run on it. A SWEEP_TOKEN secret (an App or fine-grained token with
+      # contents and pull-requests write) opens it as someone CI answers to.
+      GH_TOKEN: ${{ secrets.SWEEP_TOKEN || github.token }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.SWEEP_TOKEN || github.token }}
+      - uses: ./.github/actions/setup
+      - uses: actions/download-artifact@v8
+        with:
+          name: sweep
+          path: ${{ env.SWEEP_DIR }}
+      - name: Move each pin to the latest
+        run: node tools/sweep/bump.ts --in "$SWEEP_DIR/sweep.json" --message "$SWEEP_DIR/message.txt"
+      - name: Open or update the bump pull request
+        id: pr
+        run: |
+          if git diff --quiet; then
+            echo "Nothing moved."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$BRANCH"
+          git commit -a -s -F "$SWEEP_DIR/message.txt"
+          git push --force origin "$BRANCH"
+          { tail -n +3 "$SWEEP_DIR/message.txt"; echo; echo "Opened by \`.github/workflows/sweep.yml\`."; } > "$SWEEP_DIR/body.md"
+          url=$(gh pr list --head "$BRANCH" --state open --json url --jq '.[0].url // empty')
+          if [ -n "$url" ]; then
+            gh pr edit "$url" --body-file "$SWEEP_DIR/body.md"
+          else
+            url=$(gh pr create --head "$BRANCH" --title "$(head -n 1 "$SWEEP_DIR/message.txt")" --body-file "$SWEEP_DIR/body.md")
+          fi
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+  report:
+    needs: [sweep, bump]
+    # The bump job is skipped when nothing moves, and fails on its own; either
+    # way the issue still says what was found.
+    if: always() && needs.sweep.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write # the one tracking issue and its label
+    env:
+      GH_TOKEN: ${{ github.token }}
+      LABEL: sweep
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+      - uses: actions/download-artifact@v8
+        with:
+          name: sweep
+          path: ${{ env.SWEEP_DIR }}
+      - name: Render the issue
+        # Node builtins only, so no install.
+        env:
+          BUMP_PR: ${{ needs.bump.outputs.pr }}
+          BUMP_RESULT: ${{ needs.bump.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: >-
+          node tools/sweep/report.ts --in "$SWEEP_DIR/sweep.json" --out "$SWEEP_DIR/issue.md"
+          --bump-pr "$BUMP_PR" --bump-result "$BUMP_RESULT" --run-url "$RUN_URL"
+      - name: Rewrite, open or close the one issue
+        run: |
+          found=$(cat "$SWEEP_DIR/issue.md.count")
+          gh label create "$LABEL" --repo "$GITHUB_REPOSITORY" --color c5def5 \
+            --description "The weekly sweep's tracking issue" --force > /dev/null
+          latest=$(gh issue list --repo "$GITHUB_REPOSITORY" --label "$LABEL" --state all \
+                     --json number,state --jq 'sort_by(.number) | last // empty | "\(.number) \(.state)"')
+          number=${latest% *}
+          state=${latest#* }
+          if [ "$found" -gt 0 ]; then
+            if [ -z "$number" ]; then
+              gh issue create --repo "$GITHUB_REPOSITORY" --label "$LABEL" \
+                --title "Weekly sweep: drift outside pull requests" --body-file "$SWEEP_DIR/issue.md"
+            else
+              gh issue edit "$number" --repo "$GITHUB_REPOSITORY" --body-file "$SWEEP_DIR/issue.md"
+              if [ "$state" = "CLOSED" ]; then gh issue reopen "$number" --repo "$GITHUB_REPOSITORY"; fi
+            fi
+            echo "$found found."
+          elif [ -n "$number" ]; then
+            gh issue edit "$number" --repo "$GITHUB_REPOSITORY" --body-file "$SWEEP_DIR/issue.md"
+            if [ "$state" = "OPEN" ]; then gh issue close "$number" --repo "$GITHUB_REPOSITORY"; fi
+            echo "Clean; issue $number says so."
+          else
+            echo "Clean, and no issue to update."
+          fi
