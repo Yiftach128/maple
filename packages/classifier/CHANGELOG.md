@@ -1,5 +1,19 @@
 # @maple-kit/classifier
 
+## 0.14.1
+
+### Patch Changes
+
+- d1554a9: A sentence naming a role or a flag and a state, such as "as a member with the
+  merge forecast on, and the reviews table empty", puts the state only on the
+  call it names. Both planners judge the calls on the sentence less the listed
+  roles and flags it names, which `withoutLayers` from
+  `@maple-kit/core/connectors` returns; before, jev read the role and the flag as
+  the whole page and mocked every call, the session included.
+- Updated dependencies [48ae76a]
+- Updated dependencies [d1554a9]
+  - @maple-kit/core@0.14.1
+
 ## 0.14.0
 
 ### Patch Changes

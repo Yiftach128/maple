@@ -1,5 +1,17 @@
 # @maple-kit/core
 
+## 0.14.1
+
+### Patch Changes
+
+- 48ae76a: The Node route adapter (`toNodeMiddleware`, and so the Vite plugin) no longer crashes the server on an HTTP/2 request. It skips the pseudo-headers (`:method`, `:path`, `:scheme`, `:authority`) that `Headers` refuses, takes the host from `:authority` when there is no `host`, and builds the URL with the request's `:scheme`, so a gate published from a request served over HTTPS links back to `https://`. A handler that rejects now answers 500 instead of leaving an unhandled rejection that exits Node.
+- d1554a9: A sentence naming a role or a flag and a state, such as "as a member with the
+  merge forecast on, and the reviews table empty", puts the state only on the
+  call it names. Both planners judge the calls on the sentence less the listed
+  roles and flags it names, which `withoutLayers` from
+  `@maple-kit/core/connectors` returns; before, jev read the role and the flag as
+  the whole page and mocked every call, the session included.
+
 ## 0.14.0
 
 ### Minor Changes

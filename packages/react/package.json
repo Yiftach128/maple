@@ -1,6 +1,6 @@
 {
   "name": "@maple-kit/react",
-  "version": "0.14.0",
+  "version": "0.14.1",
   "description": "React bindings for Maple's reviewer controller",
   "license": "Apache-2.0",
   "type": "module",

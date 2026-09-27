@@ -32,7 +32,7 @@ this one. Every `docs/` path here is in the Maple repository, at
 Throughout, `acme` is your organisation and `acme/web` a repository you want
 reviewable. Substitute your own.
 
-The CLI does the parts of this that can be generated: `npx @maple-kit/cli@0.14.0
+The CLI does the parts of this that can be generated: `npx @maple-kit/cli@0.14.1
 setup app --owner=acme` prints the prefilled registration URL (`--gate` for the
 gate App), `setup verify --client-id=<Iv…>` checks Device Flow, and `setup ci`
 prints the gate workflow. Flags take `--flag=value` or `--flag value`.
