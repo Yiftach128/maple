@@ -9,7 +9,11 @@
 
 import { z } from "zod";
 
-const branch = z.string().describe("Branch or pull request the comments are on.");
+const branch = z
+  .string()
+  .describe(
+    "Head branch of the pull request the comments are on, such as `feat/login`. Not a pull request number.",
+  );
 const id = z.string().describe("The comment's id.");
 
 /** Argument shapes, by tool name. */
