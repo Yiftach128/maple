@@ -1,5 +1,11 @@
 # @maple-kit/lint
 
+## 0.1.3
+
+### Patch Changes
+
+- @maple-kit/core@0.12.1
+
 ## 0.1.2
 
 ### Patch Changes

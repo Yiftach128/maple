@@ -1,5 +1,12 @@
 # @maple-kit/mcp
 
+## 0.12.1
+
+### Patch Changes
+
+- 89872a7: A missing environment variable's startup error now says what the variable is, not only its name.
+- @maple-kit/core@0.12.1
+
 ## 0.12.0
 
 ### Patch Changes
