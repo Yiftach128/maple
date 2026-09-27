@@ -103,6 +103,16 @@ async function ring(): Promise<HTMLElement> {
   return find<HTMLElement>(".mk-ring");
 }
 
+/**
+ * The real pointer stays where the last test, or the last file on this page, left
+ * it, and a row opening under it is pointed at for real. Nothing opens mid-card.
+ */
+async function park(): Promise<void> {
+  const card = document.querySelector<HTMLElement>('[data-maple-name="YieldCard"]');
+  if (!card) throw new Error("no card on the page");
+  await userEvent.hover(card);
+}
+
 let search = "";
 let host: Root | undefined;
 
@@ -119,6 +129,7 @@ beforeEach(async () => {
   flushSync(() =>
     host?.render(createElement("div", { dangerouslySetInnerHTML: { __html: PAGE } })),
   );
+  await park();
   history.replaceState({}, "", search === "" ? location.pathname : `?${search}`);
   await render(tree());
 });

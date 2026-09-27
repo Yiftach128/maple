@@ -255,6 +255,53 @@ describe("the box, planning a sentence", () => {
     vi.useRealTimers();
   });
 
+  /** A surface waits on `request` before Apply, so it must never run ahead of the draft. */
+  it("names a sentence in the same change that puts its reading in the draft", async () => {
+    vi.useFakeTimers();
+    const full: MockPlan = {
+      ...planOf({ none: 0.7 }),
+      flags: [{ key: "new-roaster", value: false, concerned: true, p: 0.9 }],
+      role: { role: "barista", p: 0.9 },
+    };
+    const plans = [planOf({ empty: 0.7 }), full];
+    const client = createMockClient({
+      view: view(),
+      handle: handle(() => Promise.resolve(plans.shift() ?? null)),
+    });
+    const seen: ReturnType<typeof client.getState>[] = [];
+    client.subscribe((state) => seen.push(state));
+    // A slow typist: the route answers the pause before the sentence is done.
+    client.setQuery("as a barista, no roasts");
+    await settle();
+    client.setQuery("as a barista, no roasts, no new roaster");
+    await settle();
+
+    // Every distinct pairing of a sentence with a draft that a listener was shown.
+    const pairs = new Map(
+      seen
+        .filter((state) => state.request !== undefined)
+        .map(({ request, draft, draftFlags, draftAs }) => {
+          const pair = { request, draft, draftFlags, draftAs };
+          return [JSON.stringify(pair), pair] as const;
+        }),
+    );
+    expect([...pairs.values()]).toEqual([
+      {
+        request: "as a barista, no roasts",
+        draft: [{ key: LIST, state: "empty" }],
+        draftFlags: {},
+        draftAs: undefined,
+      },
+      {
+        request: "as a barista, no roasts, no new roaster",
+        draft: [],
+        draftFlags: { "new-roaster": false },
+        draftAs: { role: "barista" },
+      },
+    ]);
+    vi.useRealTimers();
+  });
+
   it("goes back to filtering for good once the route says it plans nothing", async () => {
     vi.useFakeTimers();
     const plan = vi.fn<PlanLookup>(() => Promise.reject(new PlanUnavailableError("no")));
