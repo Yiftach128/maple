@@ -1,5 +1,17 @@
 # @maple-kit/mcp
 
+## 0.14.0
+
+### Minor Changes
+
+- d1923ff: `maple-mcp` reads `MAPLE_URL`, the deployed route's mount URL. With it set, `resolve_comment` asks the route's `POST /gate/refresh` to republish `maple/visual-review`, sending the branch and `GITHUB_TOKEN`, and holds no gate credential at all. This replaces `MAPLE_GATE_TOKEN` on a developer machine, where the static installation token stopped working an hour into a session. `MAPLE_GATE_TOKEN` stays for CI, and setting both now fails at startup. A failed refresh is logged to stderr and the resolve is still recorded.
+
+### Patch Changes
+
+- e021a48: The `branch` argument of the MCP tools is described as the pull request's head branch. It used to say "branch or pull request", but a pull request number never resolved and returned no comments.
+- Updated dependencies [d1923ff]
+  - @maple-kit/core@0.14.0
+
 ## 0.13.0
 
 ### Minor Changes
