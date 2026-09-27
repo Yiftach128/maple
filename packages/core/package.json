@@ -53,7 +53,7 @@
     "access": "public"
   },
   "devDependencies": {
-    "@babel/core": "8.0.5",
+    "@babel/core": "8.0.6",
     "@zumer/snapdom": "3.1.0",
     "vitest": "5.0.1"
   },
