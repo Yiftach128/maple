@@ -22,10 +22,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          # The plugin-version step diffs against the merge base.
+          fetch-depth: 0
       - uses: ./.github/actions/setup
       - run: pnpm lint
-      - name: Every plugin skill is symlinked into .claude/skills
+      - name: Every plugin skill is symlinked into .claude/skills, and every skill is placed
         run: pnpm check:skill-links
+      - name: A change to the plugin changes its version
+        # Installed copies of the plugin update only when plugin.json's version
+        # moves, so an edit without a bump never reaches them.
+        if: github.event_name == 'pull_request'
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: pnpm check:skill-links --base "$BASE"
       - name: No new suppressions
         # `--prune-suppressions` rewrites the file when an entry is no longer
         # needed. A diff here means the ratchet moved and was not committed.

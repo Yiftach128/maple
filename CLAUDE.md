@@ -88,8 +88,14 @@ Every connector runs the shared contract suite in
 
 A skill a Maple user needs lives in `plugins/maple/skills/<name>`, and
 `.claude/skills/<name>` is a relative symlink to it; a contributor-only skill
-lives in `.claude/skills/` alone. `tools/skill-links` enforces the links, in a
-hook and in CI.
+lives in `.claude/skills/` alone, and is listed in `CONTRIBUTOR_SKILLS` in
+`tools/skill-links/check.ts`. That script enforces the links and the placement,
+in a hook and in CI.
+
+Any change under `plugins/maple/` bumps `version` in
+`plugins/maple/.claude-plugin/plugin.json`: installed copies update only when
+it changes. It is the plugin's own version, independent of the packages'. The
+same script checks it on push and on every pull request.
 
 ### Logging
 

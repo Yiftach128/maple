@@ -4,7 +4,15 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { checkSkillLinks, expectedTarget, PLUGIN_SKILLS, PROJECT_SKILLS } from "./check.js";
+import {
+  checkPluginVersion,
+  checkSkillLinks,
+  checkSkillPlacement,
+  expectedTarget,
+  listFiles,
+  PLUGIN_SKILLS,
+  PROJECT_SKILLS,
+} from "./check.js";
 
 /** One entry in a fixture tree: a plugin skill, a project directory or a link. */
 type Entry =
@@ -146,5 +154,92 @@ describe("checkSkillLinks", () => {
   it("passes on this repository", async () => {
     const root = join(import.meta.dirname, "../..");
     await expect(checkSkillLinks(root)).resolves.toEqual([]);
+  });
+});
+
+describe("checkSkillPlacement", () => {
+  const contributors = { tool: ".claude/skills/tool", vendored: ".agents/skills/vendored" };
+  const allowed = [".claude/skills/tool/SKILL.md", ".agents/skills/vendored/SKILL.md"];
+  it.each<{ case: string; files: string[]; problems: RegExp[] }>([
+    {
+      case: "plugin and contributor skills only",
+      files: [...allowed, "plugins/maple/skills/a/SKILL.md", "plugins/maple/skills/a/reference.md"],
+      problems: [],
+    },
+    {
+      case: "a user skill left in .claude/skills",
+      files: [...allowed, ".claude/skills/new/SKILL.md"],
+      problems: [/^\.claude\/skills\/new\/SKILL\.md is outside plugins\/maple\/skills\//],
+    },
+    {
+      case: "a skill anywhere else",
+      files: [...allowed, "docs/SKILL.md", "packages/x/skills/y/SKILL.md"],
+      problems: [/^docs\/SKILL\.md is outside/, /^packages\/x\/skills\/y\/SKILL\.md is outside/],
+    },
+    {
+      case: "a skill nested one level too deep in the plugin",
+      files: [...allowed, "plugins/maple/skills/a/b/SKILL.md"],
+      problems: [/^plugins\/maple\/skills\/a\/b\/SKILL\.md is outside/],
+    },
+    {
+      case: "an allowlist entry whose skill is gone",
+      files: [".claude/skills/tool/SKILL.md"],
+      problems: [/^CONTRIBUTOR_SKILLS lists vendored at \.agents\/skills\/vendored, which has no/],
+    },
+  ])("$case", ({ files, problems }) => {
+    const found = checkSkillPlacement(files, contributors);
+    expect(found).toHaveLength(problems.length);
+    problems.forEach((pattern, index) => {
+      expect(found[index]).toMatch(pattern);
+    });
+  });
+
+  it("passes on this repository", () => {
+    expect(checkSkillPlacement(listFiles(join(import.meta.dirname, "../..")))).toEqual([]);
+  });
+});
+
+describe("checkPluginVersion", () => {
+  const skill = "plugins/maple/skills/a/SKILL.md";
+  const manifest = "plugins/maple/.claude-plugin/plugin.json";
+  it.each<{ base?: string; case: string; changed: string[]; head?: string; problem?: RegExp }>([
+    { base: "1.0.0", case: "nothing in the plugin changed", changed: ["README.md"], head: "1.0.0" },
+    {
+      base: "1.0.0",
+      case: "a skill changed and the version moved",
+      changed: [skill, manifest],
+      head: "1.0.1",
+    },
+    {
+      base: "1.0.0",
+      case: "a skill changed and the version did not",
+      changed: [skill],
+      head: "1.0.0",
+      problem: /^plugins\/maple\/skills\/a\/SKILL\.md changed but .* is still 1\.0\.0\./,
+    },
+    {
+      base: "1.0.0",
+      case: "the MCP config changed and the version did not",
+      changed: ["plugins/maple/.mcp.json"],
+      head: "1.0.0",
+      problem: /^plugins\/maple\/\.mcp\.json changed/,
+    },
+    {
+      base: "1.0.0",
+      case: "the version was removed",
+      changed: [manifest],
+      problem: /has no version/,
+    },
+    { case: "the plugin is new in this change", changed: [skill], head: "0.1.0" },
+    {
+      base: "1.0.0",
+      case: "a symlink into the plugin is not the plugin",
+      changed: [".claude/skills/a"],
+      head: "1.0.0",
+    },
+  ])("$case", ({ base, changed, head, problem }) => {
+    const found = checkPluginVersion({ baseVersion: base, changed, headVersion: head });
+    if (problem === undefined) expect(found).toEqual([]);
+    else expect(found).toEqual([expect.stringMatching(problem)]);
   });
 });

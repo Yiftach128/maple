@@ -66,3 +66,8 @@ pre-push:
       # Needs a base, which a commit does not have and a push does. CI runs the
       # same check against the pull request's base.
       run: node tools/changeset-level/check.ts --base origin/main
+
+    - name: plugin-version
+      # A change under plugins/maple needs a new plugin.json version; that
+      # needs a base, which a push has and a commit does not.
+      run: node tools/skill-links/check.ts --base origin/main
