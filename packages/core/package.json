@@ -54,7 +54,7 @@
   },
   "devDependencies": {
     "@babel/core": "8.0.5",
-    "@zumer/snapdom": "3.0.0",
+    "@zumer/snapdom": "3.1.0",
     "vitest": "5.0.1"
   },
   "peerDependencies": {

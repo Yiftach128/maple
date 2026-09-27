@@ -224,8 +224,8 @@ importers:
         specifier: 8.0.5
         version: 8.0.5
       '@zumer/snapdom':
-        specifier: 3.0.0
-        version: 3.0.0
+        specifier: 3.1.0
+        version: 3.1.0
       vitest:
         specifier: 5.0.1
         version: 5.0.1(@types/node@26.5.1)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(msw@2.15.0(@types/node@26.5.1)(typescript@6.0.3))(vite@8.3.0(@types/node@26.5.1)(jiti@2.7.0)(yaml@2.9.1))
@@ -1439,8 +1439,8 @@ packages:
   '@yuku-toolchain/types@0.9.5':
     resolution: {integrity: sha512-KiuLNNgX9uNealaWAR+G3/cMXnRk9x4TY2EkYe/KIag+UPdwiA0RRf1hr1WAxzTP8KGzCTkqUdLPvqh32sEO3w==}
 
-  '@zumer/snapdom@3.0.0':
-    resolution: {integrity: sha512-O+gqKYz+7545JNgG4Hzdy9/i+7/H38bDpF6tUOCJBqAUTm9npbaE3ZxuevFBcRi6cBLpvMqVYIjtywAZIP6OFQ==}
+  '@zumer/snapdom@3.1.0':
+    resolution: {integrity: sha512-ULeezok/NSE50+ROu+M9scJ1cRBKPx7hy4SFqTVg3zLm7lihvKpIO36QAhmnudEJMlsQQIwCxzGAq5aM536fyg==}
 
   accepts@2.0.0:
     resolution: {integrity: sha512-5cvg6CtKwfgdmVqY1WIiXKc3Q1bkRqGLi+2W/6ao+6Y7gu/RCwRuAhGEzh5B4KlszSuTLgZYuqFqo5bImjNKng==}
@@ -4115,7 +4115,7 @@ snapshots:
 
   '@yuku-toolchain/types@0.9.5': {}
 
-  '@zumer/snapdom@3.0.0': {}
+  '@zumer/snapdom@3.1.0': {}
 
   accepts@2.0.0:
     dependencies:
