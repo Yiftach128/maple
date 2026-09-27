@@ -29,7 +29,7 @@ jobs:
       - name: Point npm at the public registry
         # Still needed without a token: OIDC has to know which registry it is
         # exchanging for. The credential is gone; the registry name is not.
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           registry-url: https://registry.npmjs.org
