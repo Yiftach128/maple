@@ -55,22 +55,41 @@ incomplete rather than false.
 
 | Tier            | Measures                                                             | Measured    | Threshold |
 | --------------- | -------------------------------------------------------------------- | ----------- | --------- |
-| trigger (audit) | Recall: stale paragraphs `findCandidates` picks from their own hunk. | 0.538       | 0.53      |
-| trigger (all)   | The same, over every stale paragraph.                                | 0.265       | 0.26      |
+| trigger (audit) | Recall: stale paragraphs `findCandidates` picks from their own hunk. | 0.615       | 0.61      |
+| trigger (all)   | The same, over every stale paragraph.                                | 0.765       | 0.76      |
 | word list       | Accuracy of "a quoted name is removed and not re-added".             | 0.521       | 0.52      |
 | jev             | Accuracy at `FLAG_AT` (0.4) in `tools/doc-drift/run.ts`.             | 0.765–0.798 | 0.75      |
 
-The trigger misses six of the audit's thirteen, and every miss is a paragraph
-that names nothing the hunk contains: `cookieKey` never existed in code, and
-"Maple reads none of these itself" quotes no name at all. That is the limit of
-reading references, not a bug in reading them, and is why jev is scored on
-every case rather than only on those the trigger reaches.
+Reading references alone reached 9 of the 34 stale paragraphs (0.265) and 7 of
+the audit's 13 (0.538). The history's stale paragraphs mostly state a count, a
+version or a status ("eight times", "Node 22.13", "not built yet") that no
+reference carries, so `tools/doc-drift/claims.ts` reads those claims too: a
+version on a changed line, a flag with its value, an id's shape against a
+template literal, a package's old name, `Owner.member`, a name a removed line
+declared, a list beside the member a hunk adds, a counted noun ("eight times"
+against "how many times"), four distinctive words a removed line had, and a
+"not yet" beside a new file or export it names.
 
-Over the whole set it reaches 9 of 34. The history's stale paragraphs mostly
-state a count, a version or a status ("eight times", "Node 22.13", "not built
-yet") that no reference carries. The audit's 0.53 is still gated on the audit's cases,
-where it was measured; the whole set's recall has a threshold of its own
-rather than lowering that one.
+Recall is not the only number. Every candidate costs the judge a call, so
+each signal was kept for what it reached against what it added on the last 40
+commits on `main`, every doc paragraph at the head against each commit's diff:
+
+| Trigger         | Stale reached | Current picked | Candidates, 40 commits | Per commit (median, max) |
+| --------------- | ------------- | -------------- | ---------------------- | ------------------------ |
+| references only | 9 of 34       | 11 of 37       | 672                    | 11, 75                   |
+| with claims     | 26 of 34      | 16 of 37       | 729                    | 11, 85                   |
+
+Signals that cost far more than they reached were left out: a new file's name
+as a prose word (`cookie` would reach `drift-013` and `drift-015`, and added
+662 candidates), kebab literals read as phrases (one case, 434) and bare
+numbers (none, 144). Both measures were looked at while choosing, so neither is held out;
+the thresholds say only that the trigger may not fall back.
+
+What it still misses names nothing the hunk says: `cookieKey` never existed in
+code, "Maple reads none of these itself" quotes no name at all, and the kinds
+table short of the approval methods (`drift-041`) is decided by a hunk that
+only imports their types. That is why jev is scored on every case rather than
+only on those the trigger reaches.
 
 The word list scores exactly what saying "current" every time scores. A rename
 is the one drift a word list can see, and no stale paragraph here names

@@ -85,6 +85,182 @@ describe("findCandidates", () => {
   });
 });
 
+/** One hunk of `file`, from its body lines with their prefixes; `@@ -0,0` makes it a new file. */
+function hunkIn(file: string, lines: readonly string[], header = "@@ -1,9 +1,9 @@"): string {
+  return [
+    `diff --git a/${file} b/${file}`,
+    `--- a/${file}`,
+    `+++ b/${file}`,
+    header,
+    ...lines,
+  ].join("\n");
+}
+
+describe("findCandidates · claims beyond names", () => {
+  const via = (text: string, diff: string, doc = "docs/x.md") =>
+    findCandidates(extractParagraphs(doc, text, ROOTS), parseDiff(diff), new Set()).flatMap(
+      (candidate) => candidate.via,
+    );
+
+  it.each<[string, string, string, string[]]>([
+    [
+      "a version the paragraph states as a prefix",
+      "Node 22.13 or newer.",
+      hunkIn("package.json", ['-    "node": ">=22.13.0",', '+    "node": ">=24.0.0",']),
+      ["22.13"],
+    ],
+    [
+      "a pinned version",
+      "Run `npx @maple-kit/cli@0.12.0 setup`.",
+      hunkIn("packages/cli/package.json", ['-  "version": "0.12.0",', '+  "version": "0.12.1",']),
+      ["0.12.0"],
+    ],
+    [
+      "a decimal, which is not a version",
+      "It scores 0.5 at best.",
+      hunkIn("tools/run.ts", ["-const AT = 0.5;", "+const AT = 0.4;"]),
+      [],
+    ],
+    [
+      "a flag with its value, quoted on a removed line",
+      "Flags take the `--flag=value` form only.",
+      hunkIn("packages/cli/src/args.ts", [
+        "- * Everything is `--flag`, `--flag=value` or a positional.",
+        "+ * `--owner acme` and `--owner=acme` mean the same thing.",
+      ]),
+      ["--flag=value"],
+    ],
+    [
+      "a bare flag, which a workflow's command line carries anyway",
+      "Every command takes `--json`.",
+      hunkIn("tools/sweep.ts", ["-  gh pr list --json number", "+  gh pr list --json title"]),
+      [],
+    ],
+    [
+      "an id's shape against a template literal",
+      "A comment id is `gh_<pull>_<commentId>`.",
+      hunkIn("packages/core/src/connectors/github.ts", [
+        "-  return `gh_${String(pull)}_${String(issueId)}`;",
+      ]),
+      ["gh_<pull>_<commentId>"],
+    ],
+    [
+      "a package's old name, by scope and by subpath",
+      "The packages are `@maplekit/*`; the fake is in `@maplekit/core/testing`.",
+      hunkIn("packages/core/package.json", [
+        '-  "name": "@maplekit/core",',
+        '+  "name": "@maple-kit/core",',
+      ]),
+      ["@maplekit/*", "@maplekit/core/testing"],
+    ],
+    [
+      "a package name the change keeps",
+      "Import `@maple-kit/core/logger`.",
+      hunkIn("packages/core/src/a.ts", [
+        '-import { a } from "@maple-kit/core";',
+        '+import { a, b } from "@maple-kit/core";',
+      ]),
+      [],
+    ],
+    [
+      "a member, with its owner, among the change's words",
+      "`StoreConnector.appendMany` is optional.",
+      hunkIn("packages/core/src/route/handler.ts", [
+        "-  const many = store.appendMany?.bind(store);",
+        "+async function appendAll(store: StoreConnector) {",
+      ]),
+      ["StoreConnector.appendMany"],
+    ],
+    [
+      "a lowercase name a removed line declared",
+      "`list` reads every issue comment.",
+      hunkIn("packages/core/src/connectors/github.ts", [
+        "-async function list(api: Client, query: ListQuery): Promise<CommentPage> {",
+      ]),
+      ["list"],
+    ],
+    [
+      "the members a list names, beside the one the change adds",
+      "Optional: `setStatus`, `watch`.",
+      hunkIn("packages/core/src/connectors/types.ts", [
+        "   setStatus?(id: string, status: CommentStatus): Promise<Comment>;",
+        "+  head?(branch: string): Promise<string | undefined>;",
+        "   watch?(query: ListQuery, signal: AbortSignal): Promise<CommentPage>;",
+      ]),
+      ["setStatus", "watch"],
+    ],
+    [
+      "one member beside it, which is not a list",
+      "Optional: `watch`.",
+      hunkIn("packages/core/src/connectors/types.ts", [
+        "+  head?(branch: string): Promise<string | undefined>;",
+        "   watch?(query: ListQuery, signal: AbortSignal): Promise<CommentPage>;",
+      ]),
+      [],
+    ],
+    [
+      "a count of the noun a comment counts",
+      "It blocks at most eight times.",
+      hunkIn("packages/mcp/src/stop-hook.ts", [
+        "- * How many times Maple will block before letting the agent stop anyway.",
+        "+ * How many times in a row Maple will block before letting the agent stop.",
+      ]),
+      ["times"],
+    ],
+    [
+      "a count against a number in an expression",
+      "It retries 3 times.",
+      hunkIn("packages/core/src/retry.ts", ["-  for (let at = 0; at < 3 times; at++) {"]),
+      [],
+    ],
+    [
+      "four distinctive words a removed line had",
+      "The branch under review. Required by the Stop hook.",
+      hunkIn("packages/mcp/src/environment.ts", [
+        '-    description: "The branch under review. Required by the Stop hook.",',
+        '+    description: "The branch the Stop hook checks.",',
+      ]),
+      ["the branch under review"],
+    ],
+    [
+      "four words that could be anyone's",
+      "It fails, for the same reason as before.",
+      hunkIn("packages/core/src/a.ts", ["-  // Thrown for the same reason as the other."]),
+      [],
+    ],
+    [
+      "a status beside a new file its words name",
+      "The Stop hook is not bundled yet.",
+      hunkIn("plugins/maple/hooks/hooks.json", ['+{ "hooks": {} }'], "@@ -0,0 +1 @@"),
+      ["hooks"],
+    ],
+    [
+      "a status in a document named for the new file",
+      "Not built yet.",
+      hunkIn("packages/core/src/connectors/github-gate.ts", ["+export {};"], "@@ -0,0 +1 @@"),
+      ["gate"],
+    ],
+    [
+      "a status beside a subpath export the change adds",
+      "The Vite plugin is not yet.",
+      hunkIn("packages/core/package.json", ['+    "./vite": "./dist/vite/index.js",']),
+      ["vite"],
+    ],
+    [
+      "a status beside an edit to a file that already existed",
+      "The Stop hook is not bundled yet.",
+      hunkIn("plugins/maple/hooks/hooks.json", ['+{ "hooks": {} }']),
+      [],
+    ],
+  ])("%s", (_case, text, diff, expected) => {
+    expect(via(text, diff, "docs/gate.md")).toEqual(expected);
+  });
+
+  it("reads nothing from a hunk that is not code", () => {
+    expect(via("Node 22.13 or newer.", hunkIn("docs/old.md", ["-Node 22.13.0."]))).toEqual([]);
+  });
+});
+
 describe("verdictFrom", () => {
   it("clamps the probability and names the reason", () => {
     expect(

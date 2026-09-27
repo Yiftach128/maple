@@ -44,7 +44,7 @@ const CASES = JSON.parse(
 /** Measured, each just under what was measured; the README's table has the numbers. Raised, never lowered. */
 const THRESHOLDS = {
   /** `audit` is the recall first measured, on the audit's cases alone; `all` is the whole set's. */
-  trigger: { audit: 0.53, all: 0.26 },
+  trigger: { audit: 0.61, all: 0.76 },
   names: { accuracy: 0.52 },
   jev: { accuracy: 0.75 },
 };
@@ -100,17 +100,25 @@ function misses(results: readonly { one: Case; stale: boolean }[]): string {
     .join(", ");
 }
 
-/** Stale paragraphs in `cases` that `findCandidates` picks from their own hunk, as a share. */
+function reaches(one: Case): boolean {
+  return findCandidates([paragraphOf(one)], hunksOf(one), new Set()).length === 1;
+}
+
+/**
+ * Stale paragraphs `findCandidates` picks from their own hunk, as a share.
+ * Verbose, it counts current ones picked too: each costs the judge a call.
+ */
 function recallOf(cases: readonly Case[], label: string): number {
   const stale = cases.filter((one) => one.label === "stale");
-  const reached = stale.filter(
-    (one) => findCandidates([paragraphOf(one)], hunksOf(one), new Set()).length === 1,
-  );
+  const reached = stale.filter(reaches);
   const recall = stale.length === 0 ? 1 : reached.length / stale.length;
   if (verbose) {
     const missed = stale.filter((one) => !reached.includes(one)).map((one) => one.id);
+    const current = cases.filter((one) => one.label === "current");
+    const picked = current.filter(reaches).length;
     process.stdout.write(
-      `trigger recall (${label}) ${recall.toFixed(3)}; misses ${missed.join(", ")}\n`,
+      `trigger recall (${label}) ${recall.toFixed(3)}; misses ${missed.join(", ")}; ` +
+        `current picked ${String(picked)} of ${String(current.length)}\n`,
     );
   }
   return recall;

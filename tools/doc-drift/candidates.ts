@@ -2,21 +2,24 @@
  * Which paragraphs a change could have made false. A paragraph is a candidate
  * when a reference in it, as layer 1 reads references, names a changed file,
  * the package entry or subpath holding one, or a word the change adds or
- * removes; or when a lowercase word in its inline code is a string literal on
- * a changed line. Its document must not be part of the change. Nothing judges.
+ * removes; when a lowercase word in its inline code is a string literal on a
+ * changed line; or when a claim it makes ties to the hunk, as `claims.ts`
+ * reads claims. Its document must not be part of the change. Nothing judges.
  */
 
 import { nameOf, pointsAt, wordsIn } from "../doc-references/check.ts";
+import { claimsTied, hunkFacts, paragraphFacts } from "./claims.ts";
 import { isCode } from "./diff.ts";
 
 import type { Paragraph, Reference } from "../doc-references/check.ts";
+import type { HunkFacts, ParagraphFacts } from "./claims.ts";
 import type { Hunk } from "./diff.ts";
 
-/** One paragraph, the hunks that touch what it names, and the references that tied them. */
+/** One paragraph, the hunks that touch what it names or claims, and what tied them. */
 export interface Candidate {
   readonly hunks: readonly Hunk[];
   readonly paragraph: Paragraph;
-  /** The reference texts that matched, deduplicated, in the paragraph's order. */
+  /** The references, then the claims, that matched, deduplicated. */
   readonly via: readonly string[];
 }
 
@@ -26,18 +29,25 @@ export function findCandidates(
   hunks: readonly Hunk[],
   touched: ReadonlySet<string>,
 ): Candidate[] {
-  const code = hunks.map((hunk) => {
-    const changed = [...hunk.added, ...hunk.removed].join("\n");
-    return { hunk, literals: literalsIn(changed), words: wordsIn(changed) };
-  });
+  const code = hunks
+    .filter((hunk) => isCode(hunk.file))
+    .map((hunk) => {
+      const changed = [...hunk.added, ...hunk.removed].join("\n");
+      return {
+        facts: hunkFacts(hunk),
+        hunk,
+        literals: literalsIn(changed),
+        words: wordsIn(changed),
+      };
+    });
   const found: Candidate[] = [];
   for (const paragraph of paragraphs) {
     if (touched.has(paragraph.file)) continue;
     const via = new Set<string>();
     const reached: Hunk[] = [];
-    const spans = spansIn(paragraph.text);
+    const read = { claims: paragraphFacts(paragraph), paragraph, spans: spansIn(paragraph.text) };
     for (const entry of code) {
-      const matched = matchesIn(paragraph, spans, entry);
+      const matched = matchesIn(read, entry);
       if (matched.length === 0) continue;
       reached.push(entry.hunk);
       for (const text of matched) via.add(text);
@@ -48,20 +58,27 @@ export function findCandidates(
 }
 
 interface Changed {
+  readonly facts: HunkFacts;
   readonly hunk: Hunk;
   readonly literals: ReadonlySet<string>;
   readonly words: ReadonlySet<string>;
 }
 
-/** The texts in `paragraph` that tie it to one hunk; none for prose. */
-function matchesIn(paragraph: Paragraph, spans: readonly string[], changed: Changed): string[] {
-  const { hunk, literals, words } = changed;
-  if (!isCode(hunk.file)) return [];
+interface Read {
+  readonly claims: ParagraphFacts;
+  readonly paragraph: Paragraph;
+  readonly spans: readonly string[];
+}
+
+/** The texts in a paragraph that tie it to one code hunk. */
+function matchesIn({ claims, paragraph, spans }: Read, changed: Changed): string[] {
+  const { facts, hunk, literals, words } = changed;
   return [
     ...paragraph.references
       .filter((reference) => ties(reference, hunk, words))
       .map((reference) => reference.text),
     ...spans.filter((span) => literals.has(span) || (span.includes("_") && words.has(span))),
+    ...claimsTied(claims, facts),
   ];
 }
 
