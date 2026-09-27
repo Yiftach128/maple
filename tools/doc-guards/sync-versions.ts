@@ -1,7 +1,7 @@
 /**
- * Moves every version pin to the current release, as the version pull request
- * is made: `pnpm changeset version && pnpm docs:sync-versions`. Each `0.x.y`
- * the stale-version guard would flag is rewritten to its package's
+ * Moves every version pin to the current release while the version pull
+ * request is made: `pnpm version-packages` runs it after `changeset version`.
+ * Each `0.x.y` the stale-version guard would flag is rewritten to its package's
  * package.json version, the plugin's MCP pin to @maple-kit/mcp's, and when
  * anything under plugins/maple moved, plugin.json's version gets a patch bump:
  * installed plugins update only when it changes. Rewritten Markdown is

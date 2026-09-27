@@ -47,7 +47,9 @@ jobs:
         # stale-version guard in CI never fails on the release that follows.
         uses: changesets/action@v1
         with:
-          version: pnpm changeset version && pnpm docs:sync-versions
+          # The action runs this without a shell, so `&&` would reach
+          # `changeset` as an argument; the chain lives in package.json.
+          version: pnpm version-packages
           publish: pnpm release
           title: "chore: version packages"
           # A block scalar, so the trailer survives into the commit message.

@@ -41,7 +41,8 @@
     "test": "vitest run --project node",
     "test:browser": "vitest run --project browser",
     "test:watch": "vitest",
-    "typecheck": "tsc -p tsconfig.json && pnpm --filter @maple-kit/core build && pnpm -r --filter \"./examples/*\" typecheck"
+    "typecheck": "tsc -p tsconfig.json && pnpm --filter @maple-kit/core build && pnpm -r --filter \"./examples/*\" typecheck",
+    "version-packages": "changeset version && pnpm docs:sync-versions"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",
