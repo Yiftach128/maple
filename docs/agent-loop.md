@@ -47,15 +47,28 @@ finished; Maple's answers with the open comments.
 }
 ```
 
-It blocks at most **eight times**. A hook that can block forever is a hung
-session, and the person watching an agent loop has no way out of one. On the
-ninth it lets the session end and says what is still open, which is a better
-outcome than an agent resolving comments to escape.
+The Maple Claude Code plugin registers this hook itself. It blocks while any
+comment is `open` or `needs_reverify`; `resolved` and `orphaned` comments let
+the agent stop.
+
+It blocks at most **eight stops in a row**. A hook that can block forever is a
+hung session, and the person watching an agent loop has no way out of one. On
+the ninth it lets the session end and says what is still open, which is a
+better outcome than an agent resolving comments to escape.
+
+Claude Code starts the hook afresh for every stop and says only whether the
+last one was blocked (`stop_hook_active`), so the count is kept in a file per
+`session_id` under the system temp directory. A stop no block caused starts
+it again, and a payload with no session id is blocked once, since a hook that
+cannot count cannot promise to give up.
 
 The hook reads its own environment, not the MCP server's: an `env` block in
 `.mcp.json` reaches the server and nothing else. `MAPLE_GITHUB_OWNER`,
-`MAPLE_GITHUB_REPO`, `GITHUB_TOKEN` and `MAPLE_BRANCH` have to be set where the
-client starts, or the hook fails at startup naming the one that is missing.
+`MAPLE_GITHUB_REPO` and `GITHUB_TOKEN` have to be set where the client starts,
+or the hook fails naming the one that is missing. With neither of the first two
+set it lets every stop through: installed with the plugin, it runs in every
+project, and most are not reviewed. `MAPLE_BRANCH` defaults to the branch
+checked out in the session's working directory.
 
 ## Configuration
 

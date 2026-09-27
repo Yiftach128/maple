@@ -6,6 +6,13 @@ export {
 } from "./config.js";
 export { createToolHandlers } from "./handlers.js";
 export type { CommentContext, HandlerOptions, ToolHandlers } from "./handlers.js";
+export {
+  currentBranch,
+  decideSessionStop,
+  fileBlockCounter,
+  parseStopHookPayload,
+} from "./stop-hook-session.js";
+export type { BlockCounter, StopHookPayload } from "./stop-hook-session.js";
 export { decideStop, MAX_BLOCKS } from "./stop-hook.js";
 export type { StopHookDecision, StopHookInput } from "./stop-hook.js";
 export {

@@ -45,11 +45,10 @@ them from `.mcp.json` with `${VAR}`.
 
 ## 3. Add the server to `.mcp.json`
 
-**With the Maple Claude Code plugin installed, skip this section.** The plugin
-already runs the server and reads `GITHUB_TOKEN`, `MAPLE_GITHUB_OWNER` and
-`MAPLE_GITHUB_REPO` from the environment Claude Code starts in, so export all
-three there. It does not install the Stop hook yet: add that by hand, as in
-section 4.
+**With the Maple Claude Code plugin installed, skip this section and the
+next.** The plugin runs the server and the Stop hook, and both read
+`GITHUB_TOKEN`, `MAPLE_GITHUB_OWNER` and `MAPLE_GITHUB_REPO` from the
+environment Claude Code starts in, so export all three there. Go to section 5.
 
 ```json
 {
@@ -98,7 +97,7 @@ argument instead:
 
 ## 4. Add the Stop hook
 
-In `.claude/settings.json`:
+The plugin installs this already. Without it, in `.claude/settings.json`:
 
 ```json
 {
@@ -108,7 +107,7 @@ In `.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "MAPLE_BRANCH=\"$(git branch --show-current)\" MAPLE_GITHUB_OWNER=acme MAPLE_GITHUB_REPO=web npx -y -p @maple-kit/mcp maple-stop-hook"
+            "command": "MAPLE_GITHUB_OWNER=acme MAPLE_GITHUB_REPO=web npx -y -p @maple-kit/mcp maple-stop-hook"
           }
         ]
       }
@@ -119,13 +118,21 @@ In `.claude/settings.json`:
 
 **The hook does not get `.mcp.json`'s `env`.** It is a separate process that
 inherits only Claude Code's own environment. It needs `GITHUB_TOKEN`,
-`MAPLE_GITHUB_OWNER`, `MAPLE_GITHUB_REPO` and `MAPLE_BRANCH` there or in the
-command, as above. `GITHUB_TOKEN` comes from the shell the client was started
-in (section 2); never inline it.
+`MAPLE_GITHUB_OWNER` and `MAPLE_GITHUB_REPO` there or in the command, as
+above. `GITHUB_TOKEN` comes from the shell the client was started in
+(section 2); never inline it. With neither `MAPLE_GITHUB_OWNER` nor
+`MAPLE_GITHUB_REPO` set, the hook takes the project to be one Maple does not
+review and lets every stop through.
+
+The branch is `MAPLE_BRANCH` when it is set, and otherwise the branch checked
+out in the session's working directory.
 
 The hook blocks while any comment is `open` or `needs_reverify`, and hands the
 agent a numbered list naming each comment's id, location and first line.
-`resolved` and `orphaned` comments do not block.
+`resolved` and `orphaned` comments do not block. It blocks at most eight stops
+in a row, counted per session, then lets the session end and says what is
+still open. A stop that no block caused, such as the end of your next prompt,
+starts the count again.
 
 ## 5. Verify
 
@@ -159,13 +166,15 @@ branch, because an unknown branch returns an empty list rather than an error.
 the wrong branch, and Claude Code treats a failing Stop hook as a non-blocking
 error. Run step 4 by hand. A `… is not set` error means the hook's environment
 is missing a variable (section 4). `{}` on a branch you know has open comments
-means `MAPLE_BRANCH` is not the head branch name, or the hook ran from a
-checkout on another branch.
+means `MAPLE_GITHUB_OWNER` and `MAPLE_GITHUB_REPO` are both unset in the
+hook's environment, `MAPLE_BRANCH` is not the head branch name, or the hook ran
+from a checkout on another branch.
 
-**The agent keeps being sent back and cannot finish.** The hook's eight-block
-cap counts a `blocks` field Claude Code does not send, so under Claude Code it
-blocks for as long as a comment is open. Resolve or reply to each comment, or
-interrupt the session and say what is left.
+**The agent keeps being sent back and cannot finish.** It gets eight tries in
+a row, then the hook lets it stop. The count lives in a small file per session
+under the system temp directory (`maple-stop-hook/`); if that directory cannot
+be written, the hook fails and Claude Code lets the agent stop. Resolve or
+reply to each comment, or interrupt the session and say what is left.
 
 **`list_comments` returns `[]` on a pull request that has comments.** The
 `branch` argument is wrong: a PR number, a preview hostname or a typo all

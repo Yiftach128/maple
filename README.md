@@ -117,16 +117,17 @@ signs in with.
 ## Use with Claude Code
 
 The Maple plugin bundles the skills that set Maple up and act on its
-comments, and the MCP server that reads and resolves them:
+comments, the MCP server that reads and resolves them, and the Stop hook that
+keeps an agent working while they are open:
 
 ```
 /plugin marketplace add maple-kit/maple
 /plugin install maple@maple-kit
 ```
 
-The server reads `GITHUB_TOKEN`, `MAPLE_GITHUB_OWNER` and `MAPLE_GITHUB_REPO`
-from the environment Claude Code starts in. The Stop hook is not bundled yet;
-the `setup-maple-agent-loop` skill adds it by hand.
+The server and the hook read `GITHUB_TOKEN`, `MAPLE_GITHUB_OWNER` and
+`MAPLE_GITHUB_REPO` from the environment Claude Code starts in. In a project
+where the last two are unset, the hook lets every stop through.
 
 ## Vendor-agnostic by construction
 

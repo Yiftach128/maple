@@ -84,9 +84,10 @@ describe("syncRepository", () => {
     "packages/mcp/package.json": '{ "name": "@maple-kit/mcp", "version": "0.13.0" }',
     "plugins/maple/.claude-plugin/plugin.json": '{\n  "name": "maple",\n  "version": "0.12.1"\n}\n',
     "plugins/maple/.mcp.json": '{ "args": ["-p", "@maple-kit/mcp@0.12.0"] }\n',
+    "plugins/maple/hooks/hooks.json": '{ "command": "npx -y -p @maple-kit/mcp@0.12.0 hook" }\n',
   };
 
-  it("moves the docs, the MCP pin and the plugin version together", async () => {
+  it("moves the docs, the MCP pins and the plugin version together", async () => {
     const root = await repository({
       ...base,
       "docs/a.md": "Run `npx @maple-kit/cli@0.12.0`.\n",
@@ -97,6 +98,7 @@ describe("syncRepository", () => {
       "docs/a.md",
       "plugins/maple/.claude-plugin/plugin.json",
       "plugins/maple/.mcp.json",
+      "plugins/maple/hooks/hooks.json",
       "plugins/maple/skills/s/SKILL.md",
     ]);
     expect(await readFile(join(root, "docs/a.md"), "utf8")).toBe(
@@ -105,25 +107,30 @@ describe("syncRepository", () => {
     expect(await readFile(join(root, "plugins/maple/.mcp.json"), "utf8")).toContain(
       "@maple-kit/mcp@0.13.0",
     );
+    expect(await readFile(join(root, "plugins/maple/hooks/hooks.json"), "utf8")).toContain(
+      "@maple-kit/mcp@0.13.0",
+    );
     expect(
       await readFile(join(root, "plugins/maple/.claude-plugin/plugin.json"), "utf8"),
     ).toContain('"version": "0.12.2"');
   });
 
+  const pinnedCurrent = {
+    "plugins/maple/.mcp.json": '{ "args": ["-p", "@maple-kit/mcp@0.13.0"] }\n',
+    "plugins/maple/hooks/hooks.json": '{ "command": "npx -y -p @maple-kit/mcp@0.13.0 hook" }\n',
+  };
+
   it("leaves the plugin version alone when nothing in the plugin moved", async () => {
     const root = await repository({
       ...base,
       "docs/a.md": "Run `npx @maple-kit/cli@0.12.0`.\n",
-      "plugins/maple/.mcp.json": '{ "args": ["-p", "@maple-kit/mcp@0.13.0"] }\n',
+      ...pinnedCurrent,
     });
     expect(await syncRepository(root)).toEqual(["docs/a.md"]);
   });
 
   it("writes nothing when everything is current", async () => {
-    const root = await repository({
-      ...base,
-      "plugins/maple/.mcp.json": '{ "args": ["-p", "@maple-kit/mcp@0.13.0"] }\n',
-    });
+    const root = await repository({ ...base, ...pinnedCurrent });
     expect(await syncRepository(root)).toEqual([]);
   });
 });

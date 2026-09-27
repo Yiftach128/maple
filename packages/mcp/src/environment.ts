@@ -31,7 +31,8 @@ export const ENVIRONMENT: readonly EnvironmentVariable[] = [
   {
     name: "MAPLE_BRANCH",
     secret: false,
-    description: "The branch under review. Required by the Stop hook; the server ignores it.",
+    description:
+      "The branch the Stop hook checks, else the one checked out. The server ignores it.",
   },
   {
     name: "MAPLE_GATE_TOKEN",

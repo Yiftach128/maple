@@ -151,7 +151,7 @@ describe("stalePins", () => {
     ["current", "0.11.0", []],
     ["no mcp package", undefined, []],
   ])("%s", (_case, current, expected) => {
-    expect(stalePins(config, current)).toEqual(expected);
+    expect(stalePins("plugins/maple/.mcp.json", config, current)).toEqual(expected);
   });
 });
 

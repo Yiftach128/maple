@@ -2,7 +2,7 @@
  * Moves every version pin to the current release while the version pull
  * request is made: `pnpm version-packages` runs it after `changeset version`.
  * Each `0.x.y` the stale-version guard would flag is rewritten to its package's
- * package.json version, the plugin's MCP pin to @maple-kit/mcp's, and when
+ * package.json version, the plugin's MCP pins (server and hook) to @maple-kit/mcp's, and when
  * anything under plugins/maple moved, plugin.json's version gets a patch bump:
  * installed plugins update only when it changes. Rewritten Markdown is
  * formatted with prettier, so a longer version cannot misalign a table.
@@ -17,7 +17,7 @@ import * as prettier from "prettier";
 import {
   compareVersions,
   markdownFiles,
-  MCP_CONFIG,
+  MCP_PINNED,
   mcpPins,
   packageVersions,
   versionMentions,
@@ -79,10 +79,10 @@ export async function syncRepository(root: string): Promise<string[]> {
     write(file, await prettier.format(synced, { ...options, filepath: file }));
   }
   const mcp = current.get("@maple-kit/mcp");
-  const config = join(root, MCP_CONFIG);
-  if (mcp !== undefined && existsSync(config)) {
-    const text = readFileSync(config, "utf8");
-    if (syncPins(text, mcp) !== text) write(MCP_CONFIG, syncPins(text, mcp));
+  for (const file of MCP_PINNED) {
+    if (mcp === undefined || !existsSync(join(root, file))) continue;
+    const text = readFileSync(join(root, file), "utf8");
+    if (syncPins(text, mcp) !== text) write(file, syncPins(text, mcp));
   }
   if (written.some((file) => file.startsWith("plugins/maple/"))) {
     write(PLUGIN_MANIFEST, bumpManifest(readFileSync(join(root, PLUGIN_MANIFEST), "utf8")));

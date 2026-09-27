@@ -8,12 +8,21 @@
 
 import type { Comment } from "@maple-kit/core";
 
-/** What Claude Code sends a Stop hook. Only these two fields are read. */
+/**
+ * What Claude Code writes to a Stop hook's stdin. The fields are the ones a
+ * recorded payload carries; `test/fixtures/claude-code-stop.json` is that
+ * recording, and Claude Code may add fields this type does not name.
+ */
 export interface StopHookInput {
-  /** True when this stop is itself the result of a previous block. */
-  readonly stop_hook_active?: boolean;
-  /** How many times this hook has already blocked. Maple counts its own. */
-  readonly blocks?: number;
+  readonly session_id: string;
+  readonly transcript_path: string;
+  readonly cwd: string;
+  readonly hook_event_name: "Stop";
+  /** True when this stop follows a Stop hook that blocked the previous one. */
+  readonly stop_hook_active: boolean;
+  readonly prompt_id?: string;
+  readonly permission_mode?: string;
+  readonly last_assistant_message?: string;
 }
 
 /** What a Stop hook may answer. */
@@ -23,18 +32,20 @@ export interface StopHookDecision {
 }
 
 /**
- * How many times Maple will block before letting the agent stop anyway.
+ * How many times in a row Maple will block before letting the agent stop.
  *
  * A hook that can block forever is a hung session, and a human watching an
  * agent loop has no way out of one.
  */
 export const MAX_BLOCKS = 8;
 
-/** Decides whether the agent may finish. */
-export function decideStop(open: readonly Comment[], input: StopHookInput = {}): StopHookDecision {
+/**
+ * Decides whether the agent may finish, given the comments still open and how
+ * many times in a row this hook has already blocked.
+ */
+export function decideStop(open: readonly Comment[], blocks: number): StopHookDecision {
   if (open.length === 0) return {};
 
-  const blocks = input.blocks ?? 0;
   if (blocks >= MAX_BLOCKS) {
     return {
       reason:

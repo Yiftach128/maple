@@ -86,17 +86,17 @@ a process rather than a library. `docs/agent-loop.md` covers it.
 
 <!-- generated:mcp-environment -->
 
-| Name                     | Secret | What it is                                                                  |
-| ------------------------ | ------ | --------------------------------------------------------------------------- |
-| `GITHUB_TOKEN`           | Yes    | A token that can read and write pull-request comments. Required.            |
-| `MAPLE_GITHUB_OWNER`     | No     | The repository's owner. Required.                                           |
-| `MAPLE_GITHUB_REPO`      | No     | The repository. Required.                                                   |
-| `MAPLE_GITHUB_API`       | No     | The API root, for Enterprise Server.                                        |
-| `MAPLE_STORE`            | No     | `github`, the default and so far the only one.                              |
-| `MAPLE_BRANCH`           | No     | The branch under review. Required by the Stop hook; the server ignores it.  |
-| `MAPLE_GATE_TOKEN`       | Yes    | The gate App's installation token. Absent, a resolve publishes no verdict.  |
-| `MAPLE_GATE_APP_ID`      | No     | The gate App's id, so it updates its own check run rather than another's.   |
-| `MAPLE_REQUIRE_APPROVAL` | No     | `true` to hold the gate until somebody approves, matching the route and CI. |
+| Name                     | Secret | What it is                                                                        |
+| ------------------------ | ------ | --------------------------------------------------------------------------------- |
+| `GITHUB_TOKEN`           | Yes    | A token that can read and write pull-request comments. Required.                  |
+| `MAPLE_GITHUB_OWNER`     | No     | The repository's owner. Required.                                                 |
+| `MAPLE_GITHUB_REPO`      | No     | The repository. Required.                                                         |
+| `MAPLE_GITHUB_API`       | No     | The API root, for Enterprise Server.                                              |
+| `MAPLE_STORE`            | No     | `github`, the default and so far the only one.                                    |
+| `MAPLE_BRANCH`           | No     | The branch the Stop hook checks, else the one checked out. The server ignores it. |
+| `MAPLE_GATE_TOKEN`       | Yes    | The gate App's installation token. Absent, a resolve publishes no verdict.        |
+| `MAPLE_GATE_APP_ID`      | No     | The gate App's id, so it updates its own check run rather than another's.         |
+| `MAPLE_REQUIRE_APPROVAL` | No     | `true` to hold the gate until somebody approves, matching the route and CI.       |
 
 <!-- /generated:mcp-environment -->
 

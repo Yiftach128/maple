@@ -45,17 +45,17 @@ file. A missing value fails at startup rather than on the first tool call.
 
 <!-- generated:mcp-environment -->
 
-| Name                     | Secret | What it is                                                                  |
-| ------------------------ | ------ | --------------------------------------------------------------------------- |
-| `GITHUB_TOKEN`           | Yes    | A token that can read and write pull-request comments. Required.            |
-| `MAPLE_GITHUB_OWNER`     | No     | The repository's owner. Required.                                           |
-| `MAPLE_GITHUB_REPO`      | No     | The repository. Required.                                                   |
-| `MAPLE_GITHUB_API`       | No     | The API root, for Enterprise Server.                                        |
-| `MAPLE_STORE`            | No     | `github`, the default and so far the only one.                              |
-| `MAPLE_BRANCH`           | No     | The branch under review. Required by the Stop hook; the server ignores it.  |
-| `MAPLE_GATE_TOKEN`       | Yes    | The gate App's installation token. Absent, a resolve publishes no verdict.  |
-| `MAPLE_GATE_APP_ID`      | No     | The gate App's id, so it updates its own check run rather than another's.   |
-| `MAPLE_REQUIRE_APPROVAL` | No     | `true` to hold the gate until somebody approves, matching the route and CI. |
+| Name                     | Secret | What it is                                                                        |
+| ------------------------ | ------ | --------------------------------------------------------------------------------- |
+| `GITHUB_TOKEN`           | Yes    | A token that can read and write pull-request comments. Required.                  |
+| `MAPLE_GITHUB_OWNER`     | No     | The repository's owner. Required.                                                 |
+| `MAPLE_GITHUB_REPO`      | No     | The repository. Required.                                                         |
+| `MAPLE_GITHUB_API`       | No     | The API root, for Enterprise Server.                                              |
+| `MAPLE_STORE`            | No     | `github`, the default and so far the only one.                                    |
+| `MAPLE_BRANCH`           | No     | The branch the Stop hook checks, else the one checked out. The server ignores it. |
+| `MAPLE_GATE_TOKEN`       | Yes    | The gate App's installation token. Absent, a resolve publishes no verdict.        |
+| `MAPLE_GATE_APP_ID`      | No     | The gate App's id, so it updates its own check run rather than another's.         |
+| `MAPLE_REQUIRE_APPROVAL` | No     | `true` to hold the gate until somebody approves, matching the route and CI.       |
 
 <!-- /generated:mcp-environment -->
 
@@ -94,14 +94,19 @@ finished, and Maple's answers with the comments still open:
 }
 ```
 
-It blocks at most eight times. On the ninth it lets the session end and says
-what is still open, which beats an agent resolving comments to escape.
+The Maple Claude Code plugin registers it for you. It blocks while a comment
+is `open` or `needs_reverify`, at most eight stops in a row per session; on the
+ninth it lets the session end and says what is still open, which beats an agent
+resolving comments to escape. The count is kept per `session_id` in the system
+temp directory, and a stop no block caused starts it again.
 
 **The hook does not see `.mcp.json`'s `env`.** That block is handed to the MCP
 server alone; a hook runs in the client's own environment. So
-`MAPLE_GITHUB_OWNER`, `MAPLE_GITHUB_REPO`, `GITHUB_TOKEN` and `MAPLE_BRANCH`
-have to be set where the client itself starts — under the same
-`op run --env-file` — or the hook fails at startup naming the one missing.
+`MAPLE_GITHUB_OWNER`, `MAPLE_GITHUB_REPO` and `GITHUB_TOKEN` have to be set
+where the client itself starts — under the same `op run --env-file` — or the
+hook fails naming the one missing. With neither of the first two set, it lets
+every stop through. `MAPLE_BRANCH` defaults to the branch checked out in the
+session's working directory.
 
 ## Resolving clears the gate
 

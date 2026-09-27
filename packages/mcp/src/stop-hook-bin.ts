@@ -1,27 +1,33 @@
 #!/usr/bin/env node
 import { branchFromEnvironment, storeFromEnvironment } from "./config.js";
 import { createToolHandlers } from "./handlers.js";
-import { decideStop } from "./stop-hook.js";
-
-import type { StopHookInput } from "./stop-hook.js";
+import {
+  currentBranch,
+  decideSessionStop,
+  fileBlockCounter,
+  parseStopHookPayload,
+} from "./stop-hook-session.js";
 
 /** Claude Code writes the hook's payload to stdin and reads the decision from stdout. */
-async function readInput(): Promise<StopHookInput> {
+async function readStdin(): Promise<string> {
   const chunks: Buffer[] = [];
   for await (const chunk of process.stdin) chunks.push(chunk as Buffer);
-
-  try {
-    return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}") as StopHookInput;
-  } catch {
-    return {};
-  }
+  return Buffer.concat(chunks).toString("utf8");
 }
 
-const input = await readInput();
-const handlers = createToolHandlers({ store: storeFromEnvironment(process.env) });
-const open = await handlers.listComments({
-  branch: branchFromEnvironment(process.env),
-  statuses: ["open", "needs_reverify"],
-});
+const payload = parseStopHookPayload(await readStdin());
+const env = process.env;
 
-process.stdout.write(JSON.stringify(decideStop(open, input)));
+// Installed with the plugin, the hook runs in every project; one naming no
+// Maple repository is not reviewed, and gets no error on every stop.
+if (!env["MAPLE_GITHUB_OWNER"] && !env["MAPLE_GITHUB_REPO"]) {
+  process.stdout.write("{}");
+} else {
+  const branch = branchFromEnvironment({
+    ...env,
+    MAPLE_BRANCH: env["MAPLE_BRANCH"] || currentBranch(payload.cwd ?? process.cwd()),
+  });
+  const handlers = createToolHandlers({ store: storeFromEnvironment(env) });
+  const open = await handlers.listComments({ branch, statuses: ["open", "needs_reverify"] });
+  process.stdout.write(JSON.stringify(decideSessionStop(open, payload, fileBlockCounter())));
+}

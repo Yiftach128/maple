@@ -9,7 +9,7 @@
     {
       "name": "maple",
       "source": "./plugins/maple",
-      "description": "Skills to set up Maple and act on its review comments, and the MCP server that reads and resolves them."
+      "description": "Skills to set up Maple and act on its review comments, the MCP server that reads and resolves them, and a Stop hook that keeps an agent working while they are open."
     }
   ]
 }

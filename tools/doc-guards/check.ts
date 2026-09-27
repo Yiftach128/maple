@@ -168,8 +168,8 @@ export function packageVersions(root: string): Map<string, string> {
   return versions;
 }
 
-/** Where the plugin's MCP server config lives, relative to the root. */
-export const MCP_CONFIG = "plugins/maple/.mcp.json";
+/** The plugin files that pin `@maple-kit/mcp`, relative to the root. */
+export const MCP_PINNED = ["plugins/maple/.mcp.json", "plugins/maple/hooks/hooks.json"] as const;
 
 /** Every `@maple-kit/mcp@x.y.z` pin in `text`, as `{ index, version }`. */
 export function mcpPins(text: string): { index: number; version: string }[] {
@@ -179,12 +179,12 @@ export function mcpPins(text: string): { index: number; version: string }[] {
   }));
 }
 
-/** A problem for each MCP pin in the plugin config that is not `current`. */
-export function stalePins(text: string, current: string | undefined): string[] {
+/** A problem for each MCP pin in the plugin file `file` that is not `current`. */
+export function stalePins(file: string, text: string, current: string | undefined): string[] {
   if (current === undefined) return [];
   return mcpPins(text)
     .filter((pin) => pin.version !== current)
-    .map((pin) => `${MCP_CONFIG}: pins @maple-kit/mcp@${pin.version}, not ${current}.`);
+    .map((pin) => `${file}: pins @maple-kit/mcp@${pin.version}, not ${current}.`);
 }
 
 /** Markdown this check reads: all of it except changelogs and vendored skills. */
@@ -202,10 +202,9 @@ export function markdownFiles(root: string): string[] {
 /** Runs every guard on `root`. */
 export function checkRepository(root: string): string[] {
   const current = packageVersions(root);
-  const config = join(root, MCP_CONFIG);
-  const pins = existsSync(config)
-    ? stalePins(readFileSync(config, "utf8"), current.get("@maple-kit/mcp"))
-    : [];
+  const pins = MCP_PINNED.filter((file) => existsSync(join(root, file))).flatMap((file) =>
+    stalePins(file, readFileSync(join(root, file), "utf8"), current.get("@maple-kit/mcp")),
+  );
   return [
     ...pins,
     ...markdownFiles(root).flatMap((file) => {
