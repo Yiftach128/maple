@@ -94,8 +94,7 @@ Treat it as a report to investigate, not a coordinate to edit.
 - **`devicePixelRatio`** — relevant to anything about image sharpness or
   hairline borders.
 - **`mock`** — present when the reviewer wrote the comment under a Maple Mock:
-  `calls` (each API call's key and the state it was put in: `empty`, `error`,
-  `forbidden`, `loading`, `one`, `many`, `long`, `sparse` or `mixed`), the
+  `calls` (each API call's key and the state it was put in: <!-- generated:mock-states -->`empty`, `error`, `forbidden`, `loading`, `one`, `many`, `long`, `sparse` or `mixed`<!-- /generated:mock-states -->), the
   `route` it applied on, and
   `request`, the sentence behind it. The comment is about the page _in that
   state_. Reproduce it by opening `context.url` with `?maple-mock=` set to the

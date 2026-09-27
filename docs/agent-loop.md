@@ -5,12 +5,16 @@ the overlay. Neither knows about the other; they meet in the store.
 
 ## The four tools
 
-| Tool                                             | Reads | What it is for                                                                                 |
-| ------------------------------------------------ | ----- | ---------------------------------------------------------------------------------------------- |
-| `list_comments(branch, statuses?)`               | ✓     | Everything on a branch in every status, newest first; `statuses` narrows it.                   |
-| `wait_for_comments(branch, cursor?, timeoutMs?)` | ✓     | Block until something new arrives.                                                             |
-| `get_comment_context(id, branch)`                | ✓     | Everything needed to act on one comment, and the mock it was written under with a replay link. |
-| `resolve_comment(id, sha, note?)`                |       | Mark one addressed, naming the commit.                                                         |
+<!-- generated:mcp-tools -->
+
+| Tool                                             | Reads | What it does                                                                                                                                                                                                              |
+| ------------------------------------------------ | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `list_comments(branch, statuses?)`               | ✓     | Return the review comments on a branch, newest first.                                                                                                                                                                     |
+| `wait_for_comments(branch, cursor?, timeoutMs?)` | ✓     | Block until a new comment arrives or the wait elapses. Returns status "timeout" rather than failing when nothing arrives.                                                                                                 |
+| `resolve_comment(id, sha, note?)`                |       | Mark a comment resolved, recording the commit that addressed it.                                                                                                                                                          |
+| `get_comment_context(id, branch)`                | ✓     | Return everything needed to act on one comment: anchor, viewport, surrounding markup and any replay link. A comment written under a Maple Mock carries `mock.recipe` and `mock.replay`, a link to the page in that state. |
+
+<!-- /generated:mcp-tools -->
 
 ### A timeout is a result
 

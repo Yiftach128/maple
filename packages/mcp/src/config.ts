@@ -9,6 +9,8 @@
 import { createCommentStore } from "@maple-kit/core";
 import { githubGate, githubStore } from "@maple-kit/core/connectors";
 
+import { describeVariable } from "./environment.js";
+
 import type { CommentStore, GateConnector } from "@maple-kit/core";
 
 /** Builds the store named by `MAPLE_STORE`, or the default, wrapped for use. */
@@ -64,6 +66,8 @@ export function branchFromEnvironment(env: Readonly<Record<string, string | unde
 
 function required(env: Readonly<Record<string, string | undefined>>, name: string): string {
   const value = env[name];
-  if (!value) throw new Error(`${name} is not set; Maple's MCP server cannot start without it.`);
-  return value;
+  if (value) return value;
+  const what = describeVariable(name);
+  const detail = what === undefined ? "" : ` It is: ${what}`;
+  throw new Error(`${name} is not set; Maple's MCP server cannot start without it.${detail}`);
 }

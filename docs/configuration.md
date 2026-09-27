@@ -84,6 +84,8 @@ measure against.
 The MCP server is the one place Maple reads its own environment, because it is
 a process rather than a library. `docs/agent-loop.md` covers it.
 
+<!-- generated:mcp-environment -->
+
 | Name                     | Secret | What it is                                                                  |
 | ------------------------ | ------ | --------------------------------------------------------------------------- |
 | `GITHUB_TOKEN`           | Yes    | A token that can read and write pull-request comments. Required.            |
@@ -95,6 +97,8 @@ a process rather than a library. `docs/agent-loop.md` covers it.
 | `MAPLE_GATE_TOKEN`       | Yes    | The gate App's installation token. Absent, a resolve publishes no verdict.  |
 | `MAPLE_GATE_APP_ID`      | No     | The gate App's id, so it updates its own check run rather than another's.   |
 | `MAPLE_REQUIRE_APPROVAL` | No     | `true` to hold the gate until somebody approves, matching the route and CI. |
+
+<!-- /generated:mcp-environment -->
 
 This token is an agent's, not a reviewer's, and it belongs on a developer's
 machine or in CI — never in a preview environment.

@@ -43,24 +43,34 @@ environment. In Claude Code's `.mcp.json`:
 and run the client under `op run --env-file` so `GITHUB_TOKEN` never lands in a
 file. A missing value fails at startup rather than on the first tool call.
 
-| Variable                                  | What it is                                                               |
-| ----------------------------------------- | ------------------------------------------------------------------------ |
-| `MAPLE_GITHUB_OWNER`, `MAPLE_GITHUB_REPO` | The repository.                                                          |
-| `GITHUB_TOKEN`                            | Server-side only. Never in a file.                                       |
-| `MAPLE_STORE`                             | `github`, the default and so far the only one.                           |
-| `MAPLE_GITHUB_API`                        | For GitHub Enterprise Server.                                            |
-| `MAPLE_BRANCH`                            | The branch under review. Read by the Stop hook, not the server.          |
-| `MAPLE_GATE_TOKEN`, `MAPLE_GATE_APP_ID`   | The gate App's installation token and id, so a resolve updates the gate. |
-| `MAPLE_REQUIRE_APPROVAL`                  | `true` where the gate is held until somebody approves the preview.       |
+<!-- generated:mcp-environment -->
+
+| Name                     | Secret | What it is                                                                  |
+| ------------------------ | ------ | --------------------------------------------------------------------------- |
+| `GITHUB_TOKEN`           | Yes    | A token that can read and write pull-request comments. Required.            |
+| `MAPLE_GITHUB_OWNER`     | No     | The repository's owner. Required.                                           |
+| `MAPLE_GITHUB_REPO`      | No     | The repository. Required.                                                   |
+| `MAPLE_GITHUB_API`       | No     | The API root, for Enterprise Server.                                        |
+| `MAPLE_STORE`            | No     | `github`, the default and so far the only one.                              |
+| `MAPLE_BRANCH`           | No     | The branch under review. Required by the Stop hook; the server ignores it.  |
+| `MAPLE_GATE_TOKEN`       | Yes    | The gate App's installation token. Absent, a resolve publishes no verdict.  |
+| `MAPLE_GATE_APP_ID`      | No     | The gate App's id, so it updates its own check run rather than another's.   |
+| `MAPLE_REQUIRE_APPROVAL` | No     | `true` to hold the gate until somebody approves, matching the route and CI. |
+
+<!-- /generated:mcp-environment -->
 
 ## Tools
 
-| Tool                                             | What it does                                                                                                                 |
-| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| `list_comments(branch, statuses?)`               | Every comment on the branch in every status, newest first, unless `statuses` narrows it — pass `["open"]` for the open ones. |
-| `wait_for_comments(branch, cursor?, timeoutMs?)` | Blocks for up to 55s, then returns `timeout` rather than an error.                                                           |
-| `get_comment_context(id, branch)`                | The anchor, the viewport and what the reviewer was looking at, and the mock they wrote it under with a link that replays it. |
-| `resolve_comment(id, sha, note?)`                | Closes a thread against the commit that closed it, and publishes the gate's verdict.                                         |
+<!-- generated:mcp-tools -->
+
+| Tool                                             | Reads | What it does                                                                                                                                                                                                              |
+| ------------------------------------------------ | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `list_comments(branch, statuses?)`               | ✓     | Return the review comments on a branch, newest first.                                                                                                                                                                     |
+| `wait_for_comments(branch, cursor?, timeoutMs?)` | ✓     | Block until a new comment arrives or the wait elapses. Returns status "timeout" rather than failing when nothing arrives.                                                                                                 |
+| `resolve_comment(id, sha, note?)`                |       | Mark a comment resolved, recording the commit that addressed it.                                                                                                                                                          |
+| `get_comment_context(id, branch)`                | ✓     | Return everything needed to act on one comment: anchor, viewport, surrounding markup and any replay link. A comment written under a Maple Mock carries `mock.recipe` and `mock.replay`, a link to the page in that state. |
+
+<!-- /generated:mcp-tools -->
 
 `wait_for_comments` is clamped to 55 seconds because every coding client cuts a
 tool call off at 60, and it emits `notifications/progress` every 15 seconds. A

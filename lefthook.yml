@@ -35,6 +35,11 @@ pre-commit:
       # what leaves a link dangling. It reads the working tree, in milliseconds.
       run: node tools/skill-links/check.ts
 
+    - name: docs-generated
+      # No glob: a change to the code a section restates stales a doc that is
+      # not staged. It imports a handful of source files, in under a second.
+      run: node tools/docs-generate/generate.ts --check
+
     - name: commit-identity
       # Git falls back to the global identity when a repository sets none, which
       # is how a work address ends up in a history meant to be published. This

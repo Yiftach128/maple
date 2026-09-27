@@ -36,6 +36,10 @@ jobs:
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
         run: pnpm check:skill-links --base "$BASE"
+      - name: Generated doc sections match the code
+        # Tables that restate code are rendered from it; a diff means the code
+        # moved and `pnpm docs:generate` was not run.
+        run: pnpm docs:generate --check
       - name: No new suppressions
         # `--prune-suppressions` rewrites the file when an entry is no longer
         # needed. A diff here means the ratchet moved and was not committed.

@@ -24,6 +24,7 @@
     "check:skill-links": "node tools/skill-links/check.ts",
     "check": "pnpm lint && pnpm typecheck && pnpm test",
     "demo:record": "node tools/demo-recorder/record.ts && tools/demo-recorder/encode.sh",
+    "docs:generate": "node tools/docs-generate/generate.ts",
     "examples:verify": "pnpm build && pnpm -r --filter \"./examples/*\" verify",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

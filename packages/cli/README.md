@@ -20,14 +20,18 @@ npm install -g @maple-kit/cli
 
 ## Commands
 
-| Command                        | What it does                                                          |
-| ------------------------------ | --------------------------------------------------------------------- |
-| `maple mock plan "<sentence>"` | Prints the recipe a preview's route plans for a sentence.             |
-| `maple mock schema <router>`   | Writes an OpenAPI document of a tRPC router's response types.         |
-| `maple connectors`             | Shows each connector kind and the methods it requires or may define.  |
-| `maple setup app`              | Prints the prefilled GitHub App registration URL and what follows.    |
-| `maple setup verify`           | Checks that a comment App has Device Flow on.                         |
-| `maple setup ci`               | Prints or writes the gate workflow, and the ruleset that requires it. |
+<!-- generated:cli-commands -->
+
+| Command              | What it does                                                           |
+| -------------------- | ---------------------------------------------------------------------- |
+| `maple connectors`   | Show the connector kinds and the methods each one may implement        |
+| `maple mock schema`  | Write an OpenAPI document of a tRPC router's response types            |
+| `maple mock plan`    | Print the recipe a preview's route plans for a sentence                |
+| `maple setup app`    | Print the prefilled GitHub App registration URL and the steps after it |
+| `maple setup verify` | Check that a comment App's Device Flow is on                           |
+| `maple setup ci`     | Print or write the gate workflow, and the ruleset that requires it     |
+
+<!-- /generated:cli-commands -->
 
 ### `maple setup`
 
@@ -100,6 +104,8 @@ writes the document Maple's route serves as each call's shape. It needs
 
 ### `maple connectors`
 
+<!-- generated:connector-kinds -->
+
 ```
 Connector kinds
   store         required: list, append
@@ -115,6 +121,8 @@ Connector kinds
   classifier    required: none
                 optional: score, classify, plan
 ```
+
+<!-- /generated:connector-kinds -->
 
 Built from core's own tables, so it cannot drift from the code. A connector's
 capabilities are exactly the methods it defines.

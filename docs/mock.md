@@ -62,8 +62,8 @@ that read a newer format and passed.
 - **A call not named passes through.** A mock is a list of exceptions to the
   real server, never a replacement for it. Mutations are no different: one is
   mocked only if the recipe names it.
-- **The states are a closed set**: `empty`, `error`, `forbidden`, `loading`,
-  `one`, `many`, `long`, `sparse`, `mixed`. A state outside it is refused
+- **The states are a closed set**:
+  <!-- generated:mock-states -->`empty`, `error`, `forbidden`, `loading`, `one`, `many`, `long`, `sparse` or `mixed`<!-- /generated:mock-states -->. A state outside it is refused
   rather than ignored, since a recipe that silently mocks less than it says is
   worse than one that fails. A new state is appended, so the order a box lists
   and a plan breaks ties in holds. `long`, `sparse` and `mixed` came after

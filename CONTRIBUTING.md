@@ -164,6 +164,14 @@ Lint failures are errors, never warnings. If a rule is wrong for a case, say so
 in the pull request rather than adding a suppression: the suppressions file is
 frozen and CI fails on a change to it.
 
+## Generated docs
+
+A table that restates code sits between `<!-- generated:<name> -->` and
+`<!-- /generated:<name> -->` and is rendered from that code: edit the code,
+then run `pnpm docs:generate`. Edits inside the markers are overwritten, and a
+hook and CI fail when a section no longer matches.
+`tools/docs-generate/sections.ts` lists each section and its source.
+
 ## Changesets
 
 If you changed a published package:
