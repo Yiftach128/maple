@@ -3,63 +3,71 @@
 # signal, CI is the gate.
 
 pre-commit:
-  parallel: true
+  # piped: a job that fails stops the rest, so the Node check reports alone
+  # instead of beside every pnpm job's node:sqlite stack trace.
+  piped: true
   jobs:
-    - name: gitleaks
-      run: gitleaks protect --staged --redact --verbose
-      # A secret reaching a commit is the one failure that cannot be undone by a
-      # later commit, so this runs on every file, not a glob.
+    - name: node-version
+      run: sh tools/node-version/check.sh
 
-    - name: eslint
-      glob: "*.{ts,tsx,js,mjs}"
-      run: pnpm exec eslint --max-warnings 0 --no-warn-ignored {staged_files}
-      stage_fixed: true
+    - group:
+        parallel: true
+        jobs:
+          - name: gitleaks
+            run: gitleaks protect --staged --redact --verbose
+            # A secret reaching a commit is the one failure that cannot be undone by a
+            # later commit, so this runs on every file, not a glob.
 
-    - name: prettier
-      glob: "*.{ts,tsx,js,mjs,json,md,yml,yaml}"
-      run: pnpm exec prettier --write {staged_files}
-      stage_fixed: true
+          - name: eslint
+            glob: "*.{ts,tsx,js,mjs}"
+            run: pnpm exec eslint --max-warnings 0 --no-warn-ignored {staged_files}
+            stage_fixed: true
 
-    - name: lockfile-has-no-mirror-urls
-      glob: "pnpm-lock.yaml"
-      # Installing behind a registry mirror can write that mirror's URLs into
-      # the lockfile. They work on one machine and nowhere else.
-      run: |
-        grep -qoE 'https?://' pnpm-lock.yaml \
-          && { echo "pnpm-lock.yaml contains a URL. Re-resolve against the public registry."; exit 1; } \
-          || true
+          - name: prettier
+            glob: "*.{ts,tsx,js,mjs,json,md,yml,yaml}"
+            run: pnpm exec prettier --write {staged_files}
+            stage_fixed: true
 
-    - name: skill-links
-      # Plugin skills are canonical; .claude/skills/<name> symlinks to each.
-      # No glob: a staged deletion matches none, and a deleted skill is exactly
-      # what leaves a link dangling. It reads the working tree, in milliseconds.
-      run: node tools/skill-links/check.ts
+          - name: lockfile-has-no-mirror-urls
+            glob: "pnpm-lock.yaml"
+            # Installing behind a registry mirror can write that mirror's URLs into
+            # the lockfile. They work on one machine and nowhere else.
+            run: |
+              grep -qoE 'https?://' pnpm-lock.yaml \
+                && { echo "pnpm-lock.yaml contains a URL. Re-resolve against the public registry."; exit 1; } \
+                || true
 
-    - name: docs-generated
-      # No glob: a change to the code a section restates stales a doc that is
-      # not staged. It imports a handful of source files, in under a second.
-      run: node tools/docs-generate/generate.ts --check
+          - name: skill-links
+            # Plugin skills are canonical; .claude/skills/<name> symlinks to each.
+            # No glob: a staged deletion matches none, and a deleted skill is exactly
+            # what leaves a link dangling. It reads the working tree, in milliseconds.
+            run: node tools/skill-links/check.ts
 
-    - name: doc-references
-      # No glob: renaming an env var or a file breaks a doc that is not staged.
-      # It reads what git tracks, in well under a second.
-      run: node tools/doc-references/check.ts
+          - name: docs-generated
+            # No glob: a change to the code a section restates stales a doc that is
+            # not staged. It imports a handful of source files, in under a second.
+            run: node tools/docs-generate/generate.ts --check
 
-    - name: doc-guards
-      glob: "*.{md,json}"
-      # Pins in docs and plugins/maple/.mcp.json against package.json versions;
-      # the version pull request moves them with `pnpm docs:sync-versions`.
-      run: node tools/doc-guards/check.ts
+          - name: doc-references
+            # No glob: renaming an env var or a file breaks a doc that is not staged.
+            # It reads what git tracks, in well under a second.
+            run: node tools/doc-references/check.ts
 
-    - name: commit-identity
-      # Git falls back to the global identity when a repository sets none, which
-      # is how a work address ends up in a history meant to be published. This
-      # asks only that the identity be chosen deliberately, not which one it is.
-      run: |
-        git config --local user.email >/dev/null 2>&1 \
-          || { echo "No repository-local commit identity is set. Choose the address you want published:"; \
-               echo "  git config user.name  '<name>'"; \
-               echo "  git config user.email '<email>'"; exit 1; }
+          - name: doc-guards
+            glob: "*.{md,json}"
+            # Pins in docs and plugins/maple/.mcp.json against package.json versions;
+            # the version pull request moves them with `pnpm docs:sync-versions`.
+            run: node tools/doc-guards/check.ts
+
+          - name: commit-identity
+            # Git falls back to the global identity when a repository sets none, which
+            # is how a work address ends up in a history meant to be published. This
+            # asks only that the identity be chosen deliberately, not which one it is.
+            run: |
+              git config --local user.email >/dev/null 2>&1 \
+                || { echo "No repository-local commit identity is set. Choose the address you want published:"; \
+                     echo "  git config user.name  '<name>'"; \
+                     echo "  git config user.email '<email>'"; exit 1; }
 
 commit-msg:
   jobs:
@@ -74,16 +82,22 @@ commit-msg:
           || { echo "Missing DCO sign-off. Commit with 'git commit -s'."; exit 1; }
 
 pre-push:
+  piped: true
   jobs:
-    - name: typecheck
-      run: pnpm typecheck
+    - name: node-version
+      run: sh tools/node-version/check.sh
 
-    - name: changeset-level
-      # Needs a base, which a commit does not have and a push does. CI runs the
-      # same check against the pull request's base.
-      run: node tools/changeset-level/check.ts --base origin/main
+    - group:
+        jobs:
+          - name: typecheck
+            run: pnpm typecheck
 
-    - name: plugin-version
-      # A change under plugins/maple needs a new plugin.json version; that
-      # needs a base, which a push has and a commit does not.
-      run: node tools/skill-links/check.ts --base origin/main
+          - name: changeset-level
+            # Needs a base, which a commit does not have and a push does. CI runs the
+            # same check against the pull request's base.
+            run: node tools/changeset-level/check.ts --base origin/main
+
+          - name: plugin-version
+            # A change under plugins/maple needs a new plugin.json version; that
+            # needs a base, which a push has and a commit does not.
+            run: node tools/skill-links/check.ts --base origin/main
