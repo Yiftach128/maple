@@ -13,8 +13,9 @@ the model tier whenever a credential is in the environment.
   those, scored and gated apart. Every sentence so far is `by: agent`;
   `cases/mock-plan/README.md` says why that matters and what the set needs
   next.
-- `doc-drift`: 26 paragraphs from Maple's own docs, thirteen a code change had
-  made false and their rewrites, each paired with the hunk that decides it.
+- `doc-drift`: 71 paragraphs from Maple's own docs, 34 a code change had made
+  false and 37 it had not, each paired with the hunk that decides it: the
+  setup-docs audit's 26, and 45 more from the repository's history.
 
 ## Harness
 

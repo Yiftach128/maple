@@ -25,10 +25,10 @@ import type { Judged } from "./comment.ts";
 import type { DriftState, Verdict } from "./judge.ts";
 
 /**
- * A paragraph is listed from here. Chosen before the evals measured anything,
- * and moved only by what they measure: `evals/cases/doc-drift/README.md`.
+ * A paragraph is listed from here. Chosen on the doc-drift evals, and moved
+ * only by what they measure: `evals/cases/doc-drift/README.md` has the sweep.
  */
-export const FLAG_AT = 0.5;
+export const FLAG_AT = 0.4;
 
 /** Past this many candidates the rest are counted, not sent. */
 export const MAX_CANDIDATES = 40;

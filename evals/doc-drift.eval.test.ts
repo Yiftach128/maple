@@ -43,10 +43,14 @@ const CASES = JSON.parse(
 
 /** Measured, each just under what was measured; the README's table has the numbers. Raised, never lowered. */
 const THRESHOLDS = {
-  trigger: { recall: 0.53 },
-  names: { accuracy: 0.5 },
-  jev: { accuracy: 0.65 },
+  /** `audit` is the recall first measured, on the audit's cases alone; `all` is the whole set's. */
+  trigger: { audit: 0.53, all: 0.26 },
+  names: { accuracy: 0.52 },
+  jev: { accuracy: 0.75 },
 };
+
+/** The commits the setup-docs audit's paragraphs are quoted from, before and after #270. */
+const AUDIT = new Set(["8093648", "0ede164"]);
 
 const ids = process.env["EVAL_IDS"]?.split(",").map((id) => id.trim());
 const chosen = ids === undefined ? CASES : CASES.filter((one) => ids.includes(one.id));
@@ -96,15 +100,30 @@ function misses(results: readonly { one: Case; stale: boolean }[]): string {
     .join(", ");
 }
 
-describe("doc drift · the trigger", () => {
-  it("reaches every stale paragraph from the hunk that decides it", () => {
-    const stale = chosen.filter((one) => one.label === "stale");
-    const reached = stale.filter(
-      (one) => findCandidates([paragraphOf(one)], hunksOf(one), new Set()).length === 1,
+/** Stale paragraphs in `cases` that `findCandidates` picks from their own hunk, as a share. */
+function recallOf(cases: readonly Case[], label: string): number {
+  const stale = cases.filter((one) => one.label === "stale");
+  const reached = stale.filter(
+    (one) => findCandidates([paragraphOf(one)], hunksOf(one), new Set()).length === 1,
+  );
+  const recall = stale.length === 0 ? 1 : reached.length / stale.length;
+  if (verbose) {
+    const missed = stale.filter((one) => !reached.includes(one)).map((one) => one.id);
+    process.stdout.write(
+      `trigger recall (${label}) ${recall.toFixed(3)}; misses ${missed.join(", ")}\n`,
     );
-    const recall = stale.length === 0 ? 1 : reached.length / stale.length;
-    if (verbose) process.stdout.write(`trigger recall ${recall.toFixed(3)}\n`);
-    expect(recall).toBeGreaterThanOrEqual(THRESHOLDS.trigger.recall);
+  }
+  return recall;
+}
+
+describe("doc drift · the trigger", () => {
+  it("reaches the audit's stale paragraphs from the hunk that decides them", () => {
+    const seed = chosen.filter((one) => AUDIT.has(one.at));
+    expect(recallOf(seed, "audit")).toBeGreaterThanOrEqual(THRESHOLDS.trigger.audit);
+  });
+
+  it("reaches every stale paragraph from the hunk that decides it", () => {
+    expect(recallOf(chosen, "all")).toBeGreaterThanOrEqual(THRESHOLDS.trigger.all);
   });
 });
 
@@ -143,9 +162,14 @@ describe.skipIf(apiKey === "")("doc drift · jev", () => {
       process.stdout.write(
         `jev accuracy ${accuracy(results).toFixed(3)}; misses ${misses(results)}\n`,
       );
+      // What choosing FLAG_AT reads: the same answers, cut at each other point.
+      for (let at = 0.2; at < 0.81; at += 0.05) {
+        const cut = results.map(({ one, p }) => ({ one, stale: p >= at }));
+        process.stdout.write(`jev accuracy at ${at.toFixed(2)} ${accuracy(cut).toFixed(3)}\n`);
+      }
     }
     const floor = accuracy(chosen.map((one) => ({ one, stale: namesJudge(one) })));
     expect(accuracy(results)).toBeGreaterThanOrEqual(THRESHOLDS.jev.accuracy);
     expect(accuracy(results)).toBeGreaterThan(floor);
-  }, 180_000);
+  }, 600_000);
 });

@@ -398,5 +398,720 @@
         "diff": "@@ -19,10 +19,12 @@\n   ],\n   \"exports\": {\n     \".\": \"./dist/index.js\",\n+    \"./maple\": \"./dist/maple.js\",\n     \"./composer\": \"./dist/composer/index.js\",\n     \"./icons\": \"./dist/icons/index.js\",\n     \"./island\": \"./dist/island/index.js\",\n     \"./marks\": \"./dist/marks/index.js\",\n+    \"./picker\": \"./dist/picker/index.js\",\n     \"./package.json\": \"./package.json\"\n   },\n   \"scripts\": {"
       }
     ]
+  },
+  {
+    "id": "drift-027",
+    "by": "maintainer",
+    "label": "stale",
+    "doc": "docs/agent-loop.md",
+    "at": "4d32330",
+    "paragraph": "It blocks at most **eight times**. A hook that can block forever is a hung\nsession, and the person watching an agent loop has no way out of one. On the\nninth it lets the session end and says what is still open, which is a better\noutcome than an agent resolving comments to escape.",
+    "change": [
+      {
+        "commit": "fdb20e3",
+        "file": "packages/mcp/src/stop-hook.ts",
+        "diff": "@@ -8,12 +8,21 @@\n \n import type { Comment } from \"@maple-kit/core\";\n \n-/** What Claude Code sends a Stop hook. Only these two fields are read. */\n+/**\n+ * What Claude Code writes to a Stop hook's stdin. The fields are the ones a\n+ * recorded payload carries; `test/fixtures/claude-code-stop.json` is that\n+ * recording, and Claude Code may add fields this type does not name.\n+ */\n export interface StopHookInput {\n-  /** True when this stop is itself the result of a previous block. */\n-  readonly stop_hook_active?: boolean;\n-  /** How many times this hook has already blocked. Maple counts its own. */\n-  readonly blocks?: number;\n+  readonly session_id: string;\n+  readonly transcript_path: string;\n+  readonly cwd: string;\n+  readonly hook_event_name: \"Stop\";\n+  /** True when this stop follows a Stop hook that blocked the previous one. */\n+  readonly stop_hook_active: boolean;\n+  readonly prompt_id?: string;\n+  readonly permission_mode?: string;\n+  readonly last_assistant_message?: string;\n }\n \n /** What a Stop hook may answer. */\n@@ -23,18 +32,20 @@ export interface StopHookDecision {\n }\n \n /**\n- * How many times Maple will block before letting the agent stop anyway.\n+ * How many times in a row Maple will block before letting the agent stop.\n  *\n  * A hook that can block forever is a hung session, and a human watching an\n  * agent loop has no way out of one.\n  */\n export const MAX_BLOCKS = 8;\n \n-/** Decides whether the agent may finish. */\n-export function decideStop(open: readonly Comment[], input: StopHookInput = {}): StopHookDecision {\n+/**\n+ * Decides whether the agent may finish, given the comments still open and how\n+ * many times in a row this hook has already blocked.\n+ */\n+export function decideStop(open: readonly Comment[], blocks: number): StopHookDecision {\n   if (open.length === 0) return {};\n \n-  const blocks = input.blocks ?? 0;\n   if (blocks >= MAX_BLOCKS) {\n     return {\n       reason:"
+      }
+    ]
+  },
+  {
+    "id": "drift-028",
+    "by": "maintainer",
+    "label": "current",
+    "doc": "docs/agent-loop.md",
+    "at": "fdb20e3",
+    "paragraph": "It blocks at most **eight stops in a row**. A hook that can block forever is a\nhung session, and the person watching an agent loop has no way out of one. On\nthe ninth it lets the session end and says what is still open, which is a\nbetter outcome than an agent resolving comments to escape.",
+    "change": [
+      {
+        "commit": "fdb20e3",
+        "file": "packages/mcp/src/stop-hook.ts",
+        "diff": "@@ -8,12 +8,21 @@\n \n import type { Comment } from \"@maple-kit/core\";\n \n-/** What Claude Code sends a Stop hook. Only these two fields are read. */\n+/**\n+ * What Claude Code writes to a Stop hook's stdin. The fields are the ones a\n+ * recorded payload carries; `test/fixtures/claude-code-stop.json` is that\n+ * recording, and Claude Code may add fields this type does not name.\n+ */\n export interface StopHookInput {\n-  /** True when this stop is itself the result of a previous block. */\n-  readonly stop_hook_active?: boolean;\n-  /** How many times this hook has already blocked. Maple counts its own. */\n-  readonly blocks?: number;\n+  readonly session_id: string;\n+  readonly transcript_path: string;\n+  readonly cwd: string;\n+  readonly hook_event_name: \"Stop\";\n+  /** True when this stop follows a Stop hook that blocked the previous one. */\n+  readonly stop_hook_active: boolean;\n+  readonly prompt_id?: string;\n+  readonly permission_mode?: string;\n+  readonly last_assistant_message?: string;\n }\n \n /** What a Stop hook may answer. */\n@@ -23,18 +32,20 @@ export interface StopHookDecision {\n }\n \n /**\n- * How many times Maple will block before letting the agent stop anyway.\n+ * How many times in a row Maple will block before letting the agent stop.\n  *\n  * A hook that can block forever is a hung session, and a human watching an\n  * agent loop has no way out of one.\n  */\n export const MAX_BLOCKS = 8;\n \n-/** Decides whether the agent may finish. */\n-export function decideStop(open: readonly Comment[], input: StopHookInput = {}): StopHookDecision {\n+/**\n+ * Decides whether the agent may finish, given the comments still open and how\n+ * many times in a row this hook has already blocked.\n+ */\n+export function decideStop(open: readonly Comment[], blocks: number): StopHookDecision {\n   if (open.length === 0) return {};\n \n-  const blocks = input.blocks ?? 0;\n   if (blocks >= MAX_BLOCKS) {\n     return {\n       reason:"
+      }
+    ]
+  },
+  {
+    "id": "drift-029",
+    "by": "maintainer",
+    "label": "stale",
+    "doc": "docs/agent-loop.md",
+    "at": "4d32330",
+    "paragraph": "The hook reads its own environment, not the MCP server's: an `env` block in\n`.mcp.json` reaches the server and nothing else. `MAPLE_GITHUB_OWNER`,\n`MAPLE_GITHUB_REPO`, `GITHUB_TOKEN` and `MAPLE_BRANCH` have to be set where the\nclient starts, or the hook fails at startup naming the one that is missing.",
+    "change": [
+      {
+        "commit": "fdb20e3",
+        "file": "packages/mcp/src/stop-hook-bin.ts",
+        "diff": "@@ -1,27 +1,33 @@\n #!/usr/bin/env node\n import { branchFromEnvironment, storeFromEnvironment } from \"./config.js\";\n import { createToolHandlers } from \"./handlers.js\";\n-import { decideStop } from \"./stop-hook.js\";\n-\n-import type { StopHookInput } from \"./stop-hook.js\";\n+import {\n+  currentBranch,\n+  decideSessionStop,\n+  fileBlockCounter,\n+  parseStopHookPayload,\n+} from \"./stop-hook-session.js\";\n \n /** Claude Code writes the hook's payload to stdin and reads the decision from stdout. */\n-async function readInput(): Promise<StopHookInput> {\n+async function readStdin(): Promise<string> {\n   const chunks: Buffer[] = [];\n   for await (const chunk of process.stdin) chunks.push(chunk as Buffer);\n-\n-  try {\n-    return JSON.parse(Buffer.concat(chunks).toString(\"utf8\") || \"{}\") as StopHookInput;\n-  } catch {\n-    return {};\n-  }\n+  return Buffer.concat(chunks).toString(\"utf8\");\n }\n \n-const input = await readInput();\n-const handlers = createToolHandlers({ store: storeFromEnvironment(process.env) });\n-const open = await handlers.listComments({\n-  branch: branchFromEnvironment(process.env),\n-  statuses: [\"open\", \"needs_reverify\"],\n-});\n+const payload = parseStopHookPayload(await readStdin());\n+const env = process.env;\n \n-process.stdout.write(JSON.stringify(decideStop(open, input)));\n+// Installed with the plugin, the hook runs in every project; one naming no\n+// Maple repository is not reviewed, and gets no error on every stop.\n+if (!env[\"MAPLE_GITHUB_OWNER\"] && !env[\"MAPLE_GITHUB_REPO\"]) {\n+  process.stdout.write(\"{}\");\n+} else {\n+  const branch = branchFromEnvironment({\n+    ...env,\n+    MAPLE_BRANCH: env[\"MAPLE_BRANCH\"] || currentBranch(payload.cwd ?? process.cwd()),\n+  });\n+  const handlers = createToolHandlers({ store: storeFromEnvironment(env) });\n+  const open = await handlers.listComments({ branch, statuses: [\"open\", \"needs_reverify\"] });\n+  process.stdout.write(JSON.stringify(decideSessionStop(open, payload, fileBlockCounter())));\n+}"
+      }
+    ]
+  },
+  {
+    "id": "drift-030",
+    "by": "maintainer",
+    "label": "current",
+    "doc": "docs/agent-loop.md",
+    "at": "fdb20e3",
+    "paragraph": "The hook reads its own environment, not the MCP server's: an `env` block in\n`.mcp.json` reaches the server and nothing else. `MAPLE_GITHUB_OWNER`,\n`MAPLE_GITHUB_REPO` and `GITHUB_TOKEN` have to be set where the client starts,\nor the hook fails naming the one that is missing. With neither of the first two\nset it lets every stop through: installed with the plugin, it runs in every\nproject, and most are not reviewed. `MAPLE_BRANCH` defaults to the branch\nchecked out in the session's working directory.",
+    "change": [
+      {
+        "commit": "fdb20e3",
+        "file": "packages/mcp/src/stop-hook-bin.ts",
+        "diff": "@@ -1,27 +1,33 @@\n #!/usr/bin/env node\n import { branchFromEnvironment, storeFromEnvironment } from \"./config.js\";\n import { createToolHandlers } from \"./handlers.js\";\n-import { decideStop } from \"./stop-hook.js\";\n-\n-import type { StopHookInput } from \"./stop-hook.js\";\n+import {\n+  currentBranch,\n+  decideSessionStop,\n+  fileBlockCounter,\n+  parseStopHookPayload,\n+} from \"./stop-hook-session.js\";\n \n /** Claude Code writes the hook's payload to stdin and reads the decision from stdout. */\n-async function readInput(): Promise<StopHookInput> {\n+async function readStdin(): Promise<string> {\n   const chunks: Buffer[] = [];\n   for await (const chunk of process.stdin) chunks.push(chunk as Buffer);\n-\n-  try {\n-    return JSON.parse(Buffer.concat(chunks).toString(\"utf8\") || \"{}\") as StopHookInput;\n-  } catch {\n-    return {};\n-  }\n+  return Buffer.concat(chunks).toString(\"utf8\");\n }\n \n-const input = await readInput();\n-const handlers = createToolHandlers({ store: storeFromEnvironment(process.env) });\n-const open = await handlers.listComments({\n-  branch: branchFromEnvironment(process.env),\n-  statuses: [\"open\", \"needs_reverify\"],\n-});\n+const payload = parseStopHookPayload(await readStdin());\n+const env = process.env;\n \n-process.stdout.write(JSON.stringify(decideStop(open, input)));\n+// Installed with the plugin, the hook runs in every project; one naming no\n+// Maple repository is not reviewed, and gets no error on every stop.\n+if (!env[\"MAPLE_GITHUB_OWNER\"] && !env[\"MAPLE_GITHUB_REPO\"]) {\n+  process.stdout.write(\"{}\");\n+} else {\n+  const branch = branchFromEnvironment({\n+    ...env,\n+    MAPLE_BRANCH: env[\"MAPLE_BRANCH\"] || currentBranch(payload.cwd ?? process.cwd()),\n+  });\n+  const handlers = createToolHandlers({ store: storeFromEnvironment(env) });\n+  const open = await handlers.listComments({ branch, statuses: [\"open\", \"needs_reverify\"] });\n+  process.stdout.write(JSON.stringify(decideSessionStop(open, payload, fileBlockCounter())));\n+}"
+      }
+    ]
+  },
+  {
+    "id": "drift-031",
+    "by": "maintainer",
+    "label": "stale",
+    "doc": "README.md",
+    "at": "4d32330",
+    "paragraph": "The server reads `GITHUB_TOKEN`, `MAPLE_GITHUB_OWNER` and `MAPLE_GITHUB_REPO`\nfrom the environment Claude Code starts in. The Stop hook is not bundled yet;\nthe `setup-maple-agent-loop` skill adds it by hand.",
+    "change": [
+      {
+        "commit": "fdb20e3",
+        "file": "plugins/maple/hooks/hooks.json",
+        "diff": "@@ -0,0 +1,14 @@\n+{\n+  \"hooks\": {\n+    \"Stop\": [\n+      {\n+        \"hooks\": [\n+          {\n+            \"type\": \"command\",\n+            \"command\": \"npx -y -p @maple-kit/mcp@0.12.1 maple-stop-hook\"\n+          }\n+        ]\n+      }\n+    ]\n+  }\n+}"
+      }
+    ]
+  },
+  {
+    "id": "drift-032",
+    "by": "maintainer",
+    "label": "current",
+    "doc": "README.md",
+    "at": "fdb20e3",
+    "paragraph": "The server and the hook read `GITHUB_TOKEN`, `MAPLE_GITHUB_OWNER` and\n`MAPLE_GITHUB_REPO` from the environment Claude Code starts in. In a project\nwhere the last two are unset, the hook lets every stop through.",
+    "change": [
+      {
+        "commit": "fdb20e3",
+        "file": "plugins/maple/hooks/hooks.json",
+        "diff": "@@ -0,0 +1,14 @@\n+{\n+  \"hooks\": {\n+    \"Stop\": [\n+      {\n+        \"hooks\": [\n+          {\n+            \"type\": \"command\",\n+            \"command\": \"npx -y -p @maple-kit/mcp@0.12.1 maple-stop-hook\"\n+          }\n+        ]\n+      }\n+    ]\n+  }\n+}"
+      }
+    ]
+  },
+  {
+    "id": "drift-033",
+    "by": "maintainer",
+    "label": "stale",
+    "doc": "docs/configuration.md",
+    "at": "4d32330",
+    "paragraph": "| Name                     | Secret | What it is                                                                  |\n| ------------------------ | ------ | --------------------------------------------------------------------------- |\n| `GITHUB_TOKEN`           | Yes    | A token that can read and write pull-request comments. Required.            |\n| `MAPLE_GITHUB_OWNER`     | No     | The repository's owner. Required.                                           |\n| `MAPLE_GITHUB_REPO`      | No     | The repository. Required.                                                   |\n| `MAPLE_GITHUB_API`       | No     | The API root, for Enterprise Server.                                        |\n| `MAPLE_STORE`            | No     | `github`, the default and so far the only one.                              |\n| `MAPLE_BRANCH`           | No     | The branch under review. Required by the Stop hook; the server ignores it.  |\n| `MAPLE_GATE_TOKEN`       | Yes    | The gate App's installation token. Absent, a resolve publishes no verdict.  |\n| `MAPLE_GATE_APP_ID`      | No     | The gate App's id, so it updates its own check run rather than another's.   |\n| `MAPLE_REQUIRE_APPROVAL` | No     | `true` to hold the gate until somebody approves, matching the route and CI. |",
+    "change": [
+      {
+        "commit": "fdb20e3",
+        "file": "packages/mcp/src/environment.ts",
+        "diff": "@@ -31,7 +31,8 @@ export const ENVIRONMENT: readonly EnvironmentVariable[] = [\n   {\n     name: \"MAPLE_BRANCH\",\n     secret: false,\n-    description: \"The branch under review. Required by the Stop hook; the server ignores it.\",\n+    description:\n+      \"The branch the Stop hook checks, else the one checked out. The server ignores it.\",\n   },\n   {\n     name: \"MAPLE_GATE_TOKEN\","
+      }
+    ]
+  },
+  {
+    "id": "drift-034",
+    "by": "maintainer",
+    "label": "current",
+    "doc": "docs/configuration.md",
+    "at": "fdb20e3",
+    "paragraph": "| Name                     | Secret | What it is                                                                        |\n| ------------------------ | ------ | --------------------------------------------------------------------------------- |\n| `GITHUB_TOKEN`           | Yes    | A token that can read and write pull-request comments. Required.                  |\n| `MAPLE_GITHUB_OWNER`     | No     | The repository's owner. Required.                                                 |\n| `MAPLE_GITHUB_REPO`      | No     | The repository. Required.                                                         |\n| `MAPLE_GITHUB_API`       | No     | The API root, for Enterprise Server.                                              |\n| `MAPLE_STORE`            | No     | `github`, the default and so far the only one.                                    |\n| `MAPLE_BRANCH`           | No     | The branch the Stop hook checks, else the one checked out. The server ignores it. |\n| `MAPLE_GATE_TOKEN`       | Yes    | The gate App's installation token. Absent, a resolve publishes no verdict.        |\n| `MAPLE_GATE_APP_ID`      | No     | The gate App's id, so it updates its own check run rather than another's.         |\n| `MAPLE_REQUIRE_APPROVAL` | No     | `true` to hold the gate until somebody approves, matching the route and CI.       |",
+    "change": [
+      {
+        "commit": "fdb20e3",
+        "file": "packages/mcp/src/environment.ts",
+        "diff": "@@ -31,7 +31,8 @@ export const ENVIRONMENT: readonly EnvironmentVariable[] = [\n   {\n     name: \"MAPLE_BRANCH\",\n     secret: false,\n-    description: \"The branch under review. Required by the Stop hook; the server ignores it.\",\n+    description:\n+      \"The branch the Stop hook checks, else the one checked out. The server ignores it.\",\n   },\n   {\n     name: \"MAPLE_GATE_TOKEN\","
+      }
+    ]
+  },
+  {
+    "id": "drift-035",
+    "by": "maintainer",
+    "label": "stale",
+    "doc": "CONTRIBUTING.md",
+    "at": "b38944d",
+    "paragraph": "Node 22.13 or newer, pnpm 10.",
+    "change": [
+      {
+        "commit": "00532a2",
+        "file": ".nvmrc",
+        "diff": "@@ -1 +1 @@\n-22.22.3\n+24.21.0"
+      },
+      {
+        "commit": "00532a2",
+        "file": "package.json",
+        "diff": "@@ -7,7 +7,7 @@\n   \"type\": \"module\",\n   \"packageManager\": \"pnpm@10.34.5\",\n   \"engines\": {\n-    \"node\": \">=22.13.0\",\n+    \"node\": \">=24.0.0\",\n     \"pnpm\": \">=10.0.0\"\n   },\n   \"repository\": {"
+      }
+    ]
+  },
+  {
+    "id": "drift-036",
+    "by": "maintainer",
+    "label": "current",
+    "doc": "CONTRIBUTING.md",
+    "at": "00532a2",
+    "paragraph": "Node 24, the active LTS, and pnpm 10. `.nvmrc` pins the exact version.",
+    "change": [
+      {
+        "commit": "00532a2",
+        "file": ".nvmrc",
+        "diff": "@@ -1 +1 @@\n-22.22.3\n+24.21.0"
+      },
+      {
+        "commit": "00532a2",
+        "file": "package.json",
+        "diff": "@@ -7,7 +7,7 @@\n   \"type\": \"module\",\n   \"packageManager\": \"pnpm@10.34.5\",\n   \"engines\": {\n-    \"node\": \">=22.13.0\",\n+    \"node\": \">=24.0.0\",\n     \"pnpm\": \">=10.0.0\"\n   },\n   \"repository\": {"
+      }
+    ]
+  },
+  {
+    "id": "drift-037",
+    "by": "maintainer",
+    "label": "stale",
+    "doc": "plugins/maple/skills/setup-maple-org/SKILL.md",
+    "at": "ef91b77",
+    "paragraph": "The CLI does the parts of this that can be generated: `npx @maple-kit/cli@0.12.0\nsetup app --owner=acme` prints the prefilled registration URL (`--gate` for the\ngate App), `setup verify --client-id=<Iv…>` checks Device Flow, and `setup ci`\nprints the gate workflow. Flags take the `--flag=value` form only.",
+    "change": [
+      {
+        "commit": "c448b71",
+        "file": "packages/cli/package.json",
+        "diff": "@@ -1,6 +1,6 @@\n {\n   \"name\": \"@maple-kit/cli\",\n-  \"version\": \"0.12.0\",\n+  \"version\": \"0.12.1\",\n   \"description\": \"Command line interface for Maple\",\n   \"license\": \"Apache-2.0\",\n   \"type\": \"module\","
+      }
+    ]
+  },
+  {
+    "id": "drift-038",
+    "by": "maintainer",
+    "label": "current",
+    "doc": "plugins/maple/skills/setup-maple-org/SKILL.md",
+    "at": "c448b71",
+    "paragraph": "The CLI does the parts of this that can be generated: `npx @maple-kit/cli@0.12.1\nsetup app --owner=acme` prints the prefilled registration URL (`--gate` for the\ngate App), `setup verify --client-id=<Iv…>` checks Device Flow, and `setup ci`\nprints the gate workflow. Flags take the `--flag=value` form only.",
+    "change": [
+      {
+        "commit": "c448b71",
+        "file": "packages/cli/package.json",
+        "diff": "@@ -1,6 +1,6 @@\n {\n   \"name\": \"@maple-kit/cli\",\n-  \"version\": \"0.12.0\",\n+  \"version\": \"0.12.1\",\n   \"description\": \"Command line interface for Maple\",\n   \"license\": \"Apache-2.0\",\n   \"type\": \"module\","
+      }
+    ]
+  },
+  {
+    "id": "drift-039",
+    "by": "maintainer",
+    "label": "stale",
+    "doc": "docs/connectors.md",
+    "at": "4b922ba",
+    "paragraph": "| Kind            | Required            | Optional             |\n| --------------- | ------------------- | -------------------- |\n| `store`         | `list`, `append`    | `setStatus`, `watch` |\n| `media`         | `putBlob`, `getUrl` | `remove`             |\n| `observability` | `getReplayLink`     | `fetchEvents`        |\n| `identity`      | `resolveUser`       | —                    |\n| `gate`          | `publish`           | `read`               |\n| `classifier`    | —                   | `score`, `classify`  |",
+    "change": [
+      {
+        "commit": "6e694c2",
+        "file": "packages/core/src/connectors/types.ts",
+        "diff": "@@ -60,6 +60,11 @@ export interface StoreConnector extends ConnectorMeta {\n   list(query: ListQuery): Promise<CommentPage>;\n   append(comment: NewComment): Promise<Comment>;\n   setStatus?(id: string, status: CommentStatus, resolution?: CommentResolution): Promise<Comment>;\n+  /**\n+   * The commit a surface points at now, or undefined where the backend cannot\n+   * say. A gate is about a commit, never a branch; `docs/gate.md` says why.\n+   */\n+  head?(branch: string): Promise<string | undefined>;\n   /** Long-poll for comments newer than `cursor`. Resolves empty on timeout. */\n   watch?(query: ListQuery, signal: AbortSignal): Promise<CommentPage>;\n }"
+      }
+    ]
+  },
+  {
+    "id": "drift-040",
+    "by": "maintainer",
+    "label": "current",
+    "doc": "docs/connectors.md",
+    "at": "6e694c2",
+    "paragraph": "| Kind            | Required            | Optional                     |\n| --------------- | ------------------- | ---------------------------- |\n| `store`         | `list`, `append`    | `setStatus`, `head`, `watch` |\n| `media`         | `putBlob`, `getUrl` | `remove`                     |\n| `observability` | `getReplayLink`     | `fetchEvents`                |\n| `identity`      | `resolveUser`       | —                            |\n| `gate`          | `publish`           | `read`                       |\n| `classifier`    | —                   | `score`, `classify`          |",
+    "change": [
+      {
+        "commit": "6e694c2",
+        "file": "packages/core/src/connectors/types.ts",
+        "diff": "@@ -60,6 +60,11 @@ export interface StoreConnector extends ConnectorMeta {\n   list(query: ListQuery): Promise<CommentPage>;\n   append(comment: NewComment): Promise<Comment>;\n   setStatus?(id: string, status: CommentStatus, resolution?: CommentResolution): Promise<Comment>;\n+  /**\n+   * The commit a surface points at now, or undefined where the backend cannot\n+   * say. A gate is about a commit, never a branch; `docs/gate.md` says why.\n+   */\n+  head?(branch: string): Promise<string | undefined>;\n   /** Long-poll for comments newer than `cursor`. Resolves empty on timeout. */\n   watch?(query: ListQuery, signal: AbortSignal): Promise<CommentPage>;\n }"
+      }
+    ]
+  },
+  {
+    "id": "drift-041",
+    "by": "maintainer",
+    "label": "stale",
+    "doc": "docs/connectors.md",
+    "at": "9d3df1b",
+    "paragraph": "| Kind            | Required            | Optional                     |\n| --------------- | ------------------- | ---------------------------- |\n| `store`         | `list`, `append`    | `setStatus`, `head`, `watch` |\n| `media`         | `putBlob`, `getUrl` | `remove`                     |\n| `observability` | `getReplayLink`     | `fetchEvents`                |\n| `identity`      | `resolveUser`       | —                            |\n| `gate`          | `publish`           | `read`                       |\n| `classifier`    | —                   | `score`, `classify`          |",
+    "change": [
+      {
+        "commit": "42f6077",
+        "file": "packages/core/src/connectors/types.ts",
+        "diff": "@@ -9,6 +9,7 @@\n  */\n \n import type {\n+  Approval,\n   Comment,\n   CommentResolution,\n   CommentStatus,\n@@ -16,6 +17,7 @@ import type {\n   MapleUser,\n   MediaBlob,\n   MediaRef,\n+  NewApproval,\n   NewComment,\n } from \"../types.js\";\n "
+      }
+    ]
+  },
+  {
+    "id": "drift-042",
+    "by": "maintainer",
+    "label": "current",
+    "doc": "docs/connectors.md",
+    "at": "42f6077",
+    "paragraph": "| Kind            | Required            | Optional                                                          |\n| --------------- | ------------------- | ----------------------------------------------------------------- |\n| `store`         | `list`, `append`    | `setStatus`, `head`, `watch`, `approvals`, `approve`, `unapprove` |\n| `media`         | `putBlob`, `getUrl` | `remove`                                                          |\n| `observability` | `getReplayLink`     | `fetchEvents`                                                     |\n| `identity`      | `resolveUser`       | —                                                                 |\n| `gate`          | `publish`           | `read`                                                            |\n| `classifier`    | —                   | `score`, `classify`                                               |",
+    "change": [
+      {
+        "commit": "42f6077",
+        "file": "packages/core/src/connectors/types.ts",
+        "diff": "@@ -9,6 +9,7 @@\n  */\n \n import type {\n+  Approval,\n   Comment,\n   CommentResolution,\n   CommentStatus,\n@@ -16,6 +17,7 @@ import type {\n   MapleUser,\n   MediaBlob,\n   MediaRef,\n+  NewApproval,\n   NewComment,\n } from \"../types.js\";\n "
+      }
+    ]
+  },
+  {
+    "id": "drift-043",
+    "by": "maintainer",
+    "label": "stale",
+    "doc": "docs/connectors.md",
+    "at": "40f2ee4",
+    "paragraph": "| Method      | How                                                                   | Cost                                                               |\n| ----------- | --------------------------------------------------------------------- | ------------------------------------------------------------------ |\n| `list`      | `GET /issues/{pull}/comments`, paged by GitHub's `Link` header.       | One extra call to resolve the branch to a pull request.            |\n| `append`    | `POST` the comment, then `PATCH` it with the id GitHub just assigned. | Two writes. The id cannot be known before the comment exists.      |\n| `setStatus` | `GET` the comment, rewrite its fence, `PATCH` it back.                | Two calls, and it preserves fields a newer Maple may have written. |",
+    "change": [
+      {
+        "commit": "038f2c7",
+        "file": "packages/core/src/connectors/github.ts",
+        "diff": "@@ -8,8 +8,10 @@\n  */\n \n import { exportMarkdown, parseFence } from \"../export/markdown.js\";\n+import { findPull } from \"./github-pull.js\";\n \n import type { Comment, CommentResolution, CommentStatus, NewComment } from \"../types.js\";\n+import type { PullCache, PullLookup, PullReader } from \"./github-pull.js\";\n import type { CommentPage, ListQuery, StoreConnector } from \"./types.js\";\n \n /** Everything the connector needs to reach a repository. */\n@@ -25,6 +27,16 @@ export interface GitHubStoreOptions {\n   readonly baseUrl?: string;\n   /** Injected in tests. Defaults to the global `fetch`. */\n   readonly fetch?: typeof globalThis.fetch;\n+  /**\n+   * How a branch, ticket or shortened label becomes a pull request. Left out,\n+   * the identifier has to be the head branch's own name.\n+   */\n+  readonly pull?: PullLookup;\n+  /**\n+   * Where a resolved pull request is remembered, across the per-request stores\n+   * a per-reviewer credential needs. Left out, every call asks again.\n+   */\n+  readonly cache?: PullCache;\n }\n \n const DEFAULT_BASE = \"https://api.github.com\";"
+      }
+    ]
+  },
+  {
+    "id": "drift-044",
+    "by": "maintainer",
+    "label": "current",
+    "doc": "docs/connectors.md",
+    "at": "038f2c7",
+    "paragraph": "| Method      | How                                                                   | Cost                                                                |\n| ----------- | --------------------------------------------------------------------- | ------------------------------------------------------------------- |\n| `list`      | `GET /issues/{pull}/comments`, paged by GitHub's `Link` header.       | One extra call to find the pull request, unless a `cache` holds it. |\n| `append`    | `POST` the comment, then `PATCH` it with the id GitHub just assigned. | Two writes. The id cannot be known before the comment exists.       |\n| `setStatus` | `GET` the comment, rewrite its fence, `PATCH` it back.                | Two calls, and it preserves fields a newer Maple may have written.  |",
+    "change": [
+      {
+        "commit": "038f2c7",
+        "file": "packages/core/src/connectors/github.ts",
+        "diff": "@@ -8,8 +8,10 @@\n  */\n \n import { exportMarkdown, parseFence } from \"../export/markdown.js\";\n+import { findPull } from \"./github-pull.js\";\n \n import type { Comment, CommentResolution, CommentStatus, NewComment } from \"../types.js\";\n+import type { PullCache, PullLookup, PullReader } from \"./github-pull.js\";\n import type { CommentPage, ListQuery, StoreConnector } from \"./types.js\";\n \n /** Everything the connector needs to reach a repository. */\n@@ -25,6 +27,16 @@ export interface GitHubStoreOptions {\n   readonly baseUrl?: string;\n   /** Injected in tests. Defaults to the global `fetch`. */\n   readonly fetch?: typeof globalThis.fetch;\n+  /**\n+   * How a branch, ticket or shortened label becomes a pull request. Left out,\n+   * the identifier has to be the head branch's own name.\n+   */\n+  readonly pull?: PullLookup;\n+  /**\n+   * Where a resolved pull request is remembered, across the per-request stores\n+   * a per-reviewer credential needs. Left out, every call asks again.\n+   */\n+  readonly cache?: PullCache;\n }\n \n const DEFAULT_BASE = \"https://api.github.com\";"
+      }
+    ]
+  },
+  {
+    "id": "drift-045",
+    "by": "maintainer",
+    "label": "current",
+    "doc": "docs/connectors.md",
+    "at": "038f2c7",
+    "paragraph": "A comment id is `gh_<pull>_<commentId>`, so `setStatus` needs nothing it was not\ngiven: no index, no cache, and it works in a process that never ran `list`.",
+    "change": [
+      {
+        "commit": "038f2c7",
+        "file": "packages/core/src/connectors/github.ts",
+        "diff": "@@ -8,8 +8,10 @@\n  */\n \n import { exportMarkdown, parseFence } from \"../export/markdown.js\";\n+import { findPull } from \"./github-pull.js\";\n \n import type { Comment, CommentResolution, CommentStatus, NewComment } from \"../types.js\";\n+import type { PullCache, PullLookup, PullReader } from \"./github-pull.js\";\n import type { CommentPage, ListQuery, StoreConnector } from \"./types.js\";\n \n /** Everything the connector needs to reach a repository. */\n@@ -25,6 +27,16 @@ export interface GitHubStoreOptions {\n   readonly baseUrl?: string;\n   /** Injected in tests. Defaults to the global `fetch`. */\n   readonly fetch?: typeof globalThis.fetch;\n+  /**\n+   * How a branch, ticket or shortened label becomes a pull request. Left out,\n+   * the identifier has to be the head branch's own name.\n+   */\n+  readonly pull?: PullLookup;\n+  /**\n+   * Where a resolved pull request is remembered, across the per-request stores\n+   * a per-reviewer credential needs. Left out, every call asks again.\n+   */\n+  readonly cache?: PullCache;\n }\n \n const DEFAULT_BASE = \"https://api.github.com\";"
+      }
+    ]
+  },
+  {
+    "id": "drift-046",
+    "by": "maintainer",
+    "label": "stale",
+    "doc": "docs/connectors.md",
+    "at": "42f6077",
+    "paragraph": "A comment id is `gh_<pull>_<commentId>`, so `setStatus` needs nothing it was not\ngiven: no index, no cache, and it works in a process that never ran `list`.",
+    "change": [
+      {
+        "commit": "f2132fc",
+        "file": "packages/core/src/connectors/github.ts",
+        "diff": "@@ -196,10 +289,13 @@ async function append(api: Client, comment: NewComment): Promise<Comment> {\n \n-  const draft: Comment = { ...comment, id: \"\", status: comment.status ?? \"open\" };\n-  const created = await api.request<IssueComment>(\n-    `/repos/${api.options.owner}/${api.options.repo}/issues/${String(pull)}/comments`,\n-    { method: \"POST\", body: JSON.stringify({ body: await bodyFor(api, draft) }) },\n-  );\n-\n-  const stored: Comment = { ...draft, id: idOf(pull, created.body.id) };\n-  await patch(api, created.body.id, await bodyFor(api, stored));\n+  const stored: Comment = {\n+    ...comment,\n+    id: `gh_${String(ledger.pull)}_${String(\n+      nextSeq(\n+        ledger.comments.map((one) => one.id),\n+        ID,\n+      ),\n+    )}`,\n+    status: comment.status ?? \"open\",\n+  };\n+  await writeLedger(api, { ...ledger, comments: [...ledger.comments, stored] }, true);\n   return stored;\n@@ -266,10 +418,6 @@ function isImage(ref: MediaRef): boolean {\n \n-function idOf(pull: number, issueId: number): string {\n-  return `gh_${String(pull)}_${String(issueId)}`;\n-}\n-\n-function pageOf(cursor: string): number {\n-  const page = Number(cursor);\n-  if (!Number.isInteger(page) || page < 1) throw new RangeError(`Invalid cursor: ${cursor}`);\n-  return page;\n+function offsetOf(cursor: string): number {\n+  const offset = Number(cursor);\n+  if (!Number.isInteger(offset) || offset < 0) throw new RangeError(`Invalid cursor: ${cursor}`);\n+  return offset;\n }"
+      }
+    ]
+  },
+  {
+    "id": "drift-047",
+    "by": "maintainer",
+    "label": "stale",
+    "doc": "docs/connectors.md",
+    "at": "42f6077",
+    "paragraph": "One Maple comment is one issue comment, carrying the table above its fence. That\nis what buys GitHub's own threading, reactions and notifications, and it is why\nthe fence has a byte budget.",
+    "change": [
+      {
+        "commit": "f2132fc",
+        "file": "packages/core/src/connectors/github.ts",
+        "diff": "@@ -3,6 +3,8 @@\n  *\n- * Consistency: read-your-writes. GitHub's REST API is strongly consistent for\n- * a comment's own repository.\n+ * Consistency: read-your-writes, strongly consistent within a repository.\n  * Retention: as long as the pull request exists.\n  * Credentials: one token, server-side only. It never reaches the overlay.\n+ *\n+ * Everything Maple keeps on a pull request lives in one issue comment — the\n+ * ledger — and news reposts it rather than editing it. `docs/connectors.md`.\n  */\n@@ -49,2 +59,9 @@ const PAGE_SIZE = 100;\n const ID = /^gh_(\\d+)_(\\d+)$/;\n+const APPROVAL_ID = /^gha_(\\d+)_(\\d+)$/;\n+\n+/**\n+ * Bytes the fence is held under: one ledger carries a whole pull request, and\n+ * the table above it is unbudgeted out of GitHub's 65,536 characters.\n+ */\n+const LEDGER_BUDGET = 40_000;\n "
+      }
+    ]
+  },
+  {
+    "id": "drift-048",
+    "by": "maintainer",
+    "label": "current",
+    "doc": "docs/connectors.md",
+    "at": "f2132fc",
+    "paragraph": "**Everything Maple keeps on a pull request lives in one issue comment.** It\ncarries a table of every visual comment, the sign-offs under it, and one fence\nholding all of them. It was one issue comment _per comment_ until #100, which\nbought GitHub's own threading and cost the thing people actually noticed: ten\nvisual comments were ten comments on the pull request, and the review was\nunreadable underneath them.",
+    "change": [
+      {
+        "commit": "f2132fc",
+        "file": "packages/core/src/connectors/github.ts",
+        "diff": "@@ -3,6 +3,8 @@\n  *\n- * Consistency: read-your-writes. GitHub's REST API is strongly consistent for\n- * a comment's own repository.\n+ * Consistency: read-your-writes, strongly consistent within a repository.\n  * Retention: as long as the pull request exists.\n  * Credentials: one token, server-side only. It never reaches the overlay.\n+ *\n+ * Everything Maple keeps on a pull request lives in one issue comment — the\n+ * ledger — and news reposts it rather than editing it. `docs/connectors.md`.\n  */\n@@ -49,2 +59,9 @@ const PAGE_SIZE = 100;\n const ID = /^gh_(\\d+)_(\\d+)$/;\n+const APPROVAL_ID = /^gha_(\\d+)_(\\d+)$/;\n+\n+/**\n+ * Bytes the fence is held under: one ledger carries a whole pull request, and\n+ * the table above it is unbudgeted out of GitHub's 65,536 characters.\n+ */\n+const LEDGER_BUDGET = 40_000;\n "
+      }
+    ]
+  },
+  {
+    "id": "drift-049",
+    "by": "maintainer",
+    "label": "stale",
+    "doc": "docs/connectors.md",
+    "at": "42f6077",
+    "paragraph": "**A second fence on the same pull request is a second comment.** `list` reads\nevery issue comment that carries one, so a summary that repeats them all is read\nback as one more comment — with an id nothing can resolve, because it points at\nthe summary rather than at what a reviewer clicked. It would hold the gate for\never. Anything summarising a pull request passes `fence: false` to\n`exportMarkdown` and writes the table alone; the fences on the individual\ncomments are what an agent reads.",
+    "change": [
+      {
+        "commit": "f2132fc",
+        "file": "packages/core/src/connectors/github.ts",
+        "diff": "@@ -160,30 +180,103 @@ async function head(api: Client, branch: string): Promise<string | undefined> {\n \n-async function list(api: Client, query: ListQuery): Promise<CommentPage> {\n-  if (query.limit !== undefined && query.limit <= 0) {\n-    throw new RangeError(`limit must be positive, received ${String(query.limit)}`);\n+/**\n+ * Everything Maple keeps on one pull request, and the comment it is in.\n+ * `stale` is every older ledger a half-finished repost left behind.\n+ */\n+interface Ledger {\n+  readonly branch: string;\n+  readonly pull: number;\n+  readonly issueId: number | undefined;\n+  readonly stale: readonly number[];\n+  readonly comments: readonly Comment[];\n+  readonly approvals: readonly Approval[];\n+}\n+\n+/** Reads the ledger for the pull request a surface identifier resolves to. */\n+async function readLedger(api: Client, branch: string): Promise<Ledger | undefined> {\n+  const pull = await pullFor(api, branch);\n+  return pull === undefined ? undefined : await readLedgerAt(api, pull, branch);\n+}\n+\n+/**\n+ * Reads the ledger of a known pull request; the newest Maple comment wins.\n+ * Without a branch the fence's own is taken: an id never names one.\n+ */\n+async function readLedgerAt(api: Client, pull: number, branch?: string): Promise<Ledger> {\n+  const found: { id: number; body: string }[] = [];\n+  for (let page = 1; page <= PAGE_SIZE; page += 1) {\n+    const path = `/repos/${api.options.owner}/${api.options.repo}/issues/${String(pull)}/comments?per_page=${String(PAGE_SIZE)}&page=${String(page)}`;\n+    const { body, hasNext } = await api.request<IssueComment[]>(path);\n+    for (const issue of body) {\n+      if (parseFence(issue.body)) found.push({ id: issue.id, body: issue.body });\n+    }\n+    if (!hasNext) break;\n   }\n \n-  const pull = await pullFor(api, query.branch);\n-  if (pull === undefined) return { comments: [] };\n+  const newest = found.at(-1);\n+  const fence = newest === undefined ? undefined : parseFence(newest.body);\n+  const surface = branch ?? fence?.branch ?? \"\";\n \n-  const page = query.cursor === undefined ? 1 : pageOf(query.cursor);\n-  const perPage = Math.min(query.limit ?? PAGE_SIZE, PAGE_SIZE);\n-  const path = `/repos/${api.options.owner}/${api.options.repo}/issues/${String(pull)}/comments?per_page=${String(perPage)}&page=${String(page)}`;\n+  return {\n+    branch: surface,\n+    pull,\n+    issueId: newest?.id,\n+    stale: found.slice(0, -1).map((one) => one.id),\n+    comments: fence?.comments.map((comment) => ({ ...comment, branch: surface })) ?? [],\n+    approvals: fence?.approvals ?? [],\n+  };\n+}\n+\n+/**\n+ * Writes the ledger back. `repost` creates the new comment before deleting the\n+ * old one, so an interrupted write leaves two Maple comments rather than none.\n+ */\n+async function writeLedger(api: Client, ledger: Ledger, repost: boolean): Promise<void> {\n+  const body = await bodyFor(api, ledger);\n+  const { owner, repo } = api.options;\n+  const gone = [...ledger.stale];\n+\n+  if (repost || ledger.issueId === undefined) {\n+    await api.request<IssueComment>(\n+      `/repos/${owner}/${repo}/issues/${String(ledger.pull)}/comments`,\n+      { method: \"POST\", body: JSON.stringify({ body }) },\n+    );\n+    if (ledger.issueId !== undefined) gone.push(ledger.issueId);\n+  } else {\n+    await api.request<IssueComment>(\n+      `/repos/${owner}/${repo}/issues/comments/${String(ledger.issueId)}`,\n+      { method: \"PATCH\", body: JSON.stringify({ body }) },\n+    );\n+  }\n \n-  const { body, hasNext } = await api.request<IssueComment[]>(path);\n-  const comments = body\n-    .map((issue) => commentIn(issue, pull, query.branch))\n-    .filter((comment): comment is Comment => comment !== undefined)\n-    .filter((comment) => query.statuses === undefined || query.statuses.includes(comment.status));\n+  for (const id of gone) await remove(api, id);\n+}\n \n-  return { comments, ...(hasNext ? { cursor: String(page + 1) } : {}) };\n+/** A comment that will not delete is a duplicate, not a failed write. */\n+async function remove(api: Client, issueId: number): Promise<void> {\n+  const { owner, repo } = api.options;\n+  try {\n+    await api.request<unknown>(`/repos/${owner}/${repo}/issues/comments/${String(issueId)}`, {\n+      method: \"DELETE\",\n+    });\n+  } catch {\n+    // Left in place. `readLedger` takes the newest, so it shadows rather than wins.\n+  }\n }\n \n-/** Reads Maple's fence out of an issue comment, ignoring everyone else's. */\n-function commentIn(issue: IssueComment, pull: number, branch: string): Comment | undefined {\n-  const fence = parseFence(issue.body);\n-  const stored = fence?.comments[0];\n-  if (!stored) return undefined;\n+async function list(api: Client, query: ListQuery): Promise<CommentPage> {\n+  if (query.limit !== undefined && query.limit <= 0) {\n+    throw new RangeError(`limit must be positive, received ${String(query.limit)}`);\n+  }\n+\n+  const ledger = await readLedger(api, query.branch);\n+  if (!ledger) return { comments: [] };\n \n-  return { ...stored, id: idOf(pull, issue.id), branch };\n+  const matching = ledger.comments.filter(\n+    (comment) => query.statuses === undefined || query.statuses.includes(comment.status),\n+  );\n+  const offset = query.cursor === undefined ? 0 : offsetOf(query.cursor);\n+  const page = matching.slice(offset, offset + (query.limit ?? matching.length));\n+  const next = offset + page.length;\n+\n+  return { comments: page, ...(next < matching.length ? { cursor: String(next) } : {}) };\n }\n@@ -216,12 +316,11 @@ async function setStatus(\n \n-  const issueId = Number(located[2]);\n-  const { body } = await api.request<IssueComment>(\n-    `/repos/${api.options.owner}/${api.options.repo}/issues/comments/${String(issueId)}`,\n+  const ledger = await ledgerHolding(api, Number(located[1]), id, (one) =>\n+    one.comments.some((held) => held.id === id),\n   );\n+  const existing = ledger.comments.find((one) => one.id === id);\n+  if (!existing) throw new Error(`No comment ${id} on this pull request.`);\n \n-  const stored = parseFence(body.body)?.comments[0];\n-  if (!stored) throw new Error(`Comment ${id} carries no Maple fence.`);\n-\n-  const updated: Comment = { ...stored, id, status, ...(resolution ? { resolution } : {}) };\n-  await patch(api, issueId, await bodyFor(api, updated));\n+  const updated: Comment = { ...existing, status, ...(resolution ? { resolution } : {}) };\n+  const comments = ledger.comments.map((one) => (one.id === id ? updated : one));\n+  await writeLedger(api, { ...ledger, comments }, false);\n   return updated;"
+      }
+    ]
+  },
+  {
+    "id": "drift-050",
+    "by": "maintainer",
+    "label": "current",
+    "doc": "docs/connectors.md",
+    "at": "f2132fc",
+    "paragraph": "**A fence anywhere else on the pull request is read as a ledger.** Anything\nsummarising a pull request therefore passes `fence: false` to `exportMarkdown`\nand writes the table alone — otherwise the summary shadows the real ledger and\nthe comments in it become unreachable.",
+    "change": [
+      {
+        "commit": "f2132fc",
+        "file": "packages/core/src/connectors/github.ts",
+        "diff": "@@ -160,30 +180,103 @@ async function head(api: Client, branch: string): Promise<string | undefined> {\n \n-async function list(api: Client, query: ListQuery): Promise<CommentPage> {\n-  if (query.limit !== undefined && query.limit <= 0) {\n-    throw new RangeError(`limit must be positive, received ${String(query.limit)}`);\n+/**\n+ * Everything Maple keeps on one pull request, and the comment it is in.\n+ * `stale` is every older ledger a half-finished repost left behind.\n+ */\n+interface Ledger {\n+  readonly branch: string;\n+  readonly pull: number;\n+  readonly issueId: number | undefined;\n+  readonly stale: readonly number[];\n+  readonly comments: readonly Comment[];\n+  readonly approvals: readonly Approval[];\n+}\n+\n+/** Reads the ledger for the pull request a surface identifier resolves to. */\n+async function readLedger(api: Client, branch: string): Promise<Ledger | undefined> {\n+  const pull = await pullFor(api, branch);\n+  return pull === undefined ? undefined : await readLedgerAt(api, pull, branch);\n+}\n+\n+/**\n+ * Reads the ledger of a known pull request; the newest Maple comment wins.\n+ * Without a branch the fence's own is taken: an id never names one.\n+ */\n+async function readLedgerAt(api: Client, pull: number, branch?: string): Promise<Ledger> {\n+  const found: { id: number; body: string }[] = [];\n+  for (let page = 1; page <= PAGE_SIZE; page += 1) {\n+    const path = `/repos/${api.options.owner}/${api.options.repo}/issues/${String(pull)}/comments?per_page=${String(PAGE_SIZE)}&page=${String(page)}`;\n+    const { body, hasNext } = await api.request<IssueComment[]>(path);\n+    for (const issue of body) {\n+      if (parseFence(issue.body)) found.push({ id: issue.id, body: issue.body });\n+    }\n+    if (!hasNext) break;\n   }\n \n-  const pull = await pullFor(api, query.branch);\n-  if (pull === undefined) return { comments: [] };\n+  const newest = found.at(-1);\n+  const fence = newest === undefined ? undefined : parseFence(newest.body);\n+  const surface = branch ?? fence?.branch ?? \"\";\n \n-  const page = query.cursor === undefined ? 1 : pageOf(query.cursor);\n-  const perPage = Math.min(query.limit ?? PAGE_SIZE, PAGE_SIZE);\n-  const path = `/repos/${api.options.owner}/${api.options.repo}/issues/${String(pull)}/comments?per_page=${String(perPage)}&page=${String(page)}`;\n+  return {\n+    branch: surface,\n+    pull,\n+    issueId: newest?.id,\n+    stale: found.slice(0, -1).map((one) => one.id),\n+    comments: fence?.comments.map((comment) => ({ ...comment, branch: surface })) ?? [],\n+    approvals: fence?.approvals ?? [],\n+  };\n+}\n+\n+/**\n+ * Writes the ledger back. `repost` creates the new comment before deleting the\n+ * old one, so an interrupted write leaves two Maple comments rather than none.\n+ */\n+async function writeLedger(api: Client, ledger: Ledger, repost: boolean): Promise<void> {\n+  const body = await bodyFor(api, ledger);\n+  const { owner, repo } = api.options;\n+  const gone = [...ledger.stale];\n+\n+  if (repost || ledger.issueId === undefined) {\n+    await api.request<IssueComment>(\n+      `/repos/${owner}/${repo}/issues/${String(ledger.pull)}/comments`,\n+      { method: \"POST\", body: JSON.stringify({ body }) },\n+    );\n+    if (ledger.issueId !== undefined) gone.push(ledger.issueId);\n+  } else {\n+    await api.request<IssueComment>(\n+      `/repos/${owner}/${repo}/issues/comments/${String(ledger.issueId)}`,\n+      { method: \"PATCH\", body: JSON.stringify({ body }) },\n+    );\n+  }\n \n-  const { body, hasNext } = await api.request<IssueComment[]>(path);\n-  const comments = body\n-    .map((issue) => commentIn(issue, pull, query.branch))\n-    .filter((comment): comment is Comment => comment !== undefined)\n-    .filter((comment) => query.statuses === undefined || query.statuses.includes(comment.status));\n+  for (const id of gone) await remove(api, id);\n+}\n \n-  return { comments, ...(hasNext ? { cursor: String(page + 1) } : {}) };\n+/** A comment that will not delete is a duplicate, not a failed write. */\n+async function remove(api: Client, issueId: number): Promise<void> {\n+  const { owner, repo } = api.options;\n+  try {\n+    await api.request<unknown>(`/repos/${owner}/${repo}/issues/comments/${String(issueId)}`, {\n+      method: \"DELETE\",\n+    });\n+  } catch {\n+    // Left in place. `readLedger` takes the newest, so it shadows rather than wins.\n+  }\n }\n \n-/** Reads Maple's fence out of an issue comment, ignoring everyone else's. */\n-function commentIn(issue: IssueComment, pull: number, branch: string): Comment | undefined {\n-  const fence = parseFence(issue.body);\n-  const stored = fence?.comments[0];\n-  if (!stored) return undefined;\n+async function list(api: Client, query: ListQuery): Promise<CommentPage> {\n+  if (query.limit !== undefined && query.limit <= 0) {\n+    throw new RangeError(`limit must be positive, received ${String(query.limit)}`);\n+  }\n+\n+  const ledger = await readLedger(api, query.branch);\n+  if (!ledger) return { comments: [] };\n \n-  return { ...stored, id: idOf(pull, issue.id), branch };\n+  const matching = ledger.comments.filter(\n+    (comment) => query.statuses === undefined || query.statuses.includes(comment.status),\n+  );\n+  const offset = query.cursor === undefined ? 0 : offsetOf(query.cursor);\n+  const page = matching.slice(offset, offset + (query.limit ?? matching.length));\n+  const next = offset + page.length;\n+\n+  return { comments: page, ...(next < matching.length ? { cursor: String(next) } : {}) };\n }\n@@ -216,12 +316,11 @@ async function setStatus(\n \n-  const issueId = Number(located[2]);\n-  const { body } = await api.request<IssueComment>(\n-    `/repos/${api.options.owner}/${api.options.repo}/issues/comments/${String(issueId)}`,\n+  const ledger = await ledgerHolding(api, Number(located[1]), id, (one) =>\n+    one.comments.some((held) => held.id === id),\n   );\n+  const existing = ledger.comments.find((one) => one.id === id);\n+  if (!existing) throw new Error(`No comment ${id} on this pull request.`);\n \n-  const stored = parseFence(body.body)?.comments[0];\n-  if (!stored) throw new Error(`Comment ${id} carries no Maple fence.`);\n-\n-  const updated: Comment = { ...stored, id, status, ...(resolution ? { resolution } : {}) };\n-  await patch(api, issueId, await bodyFor(api, updated));\n+  const updated: Comment = { ...existing, status, ...(resolution ? { resolution } : {}) };\n+  const comments = ledger.comments.map((one) => (one.id === id ? updated : one));\n+  await writeLedger(api, { ...ledger, comments }, false);\n   return updated;"
+      }
+    ]
+  },
+  {
+    "id": "drift-051",
+    "by": "maintainer",
+    "label": "stale",
+    "doc": "docs/agent-loop.md",
+    "at": "22f0fc5",
+    "paragraph": "- **`resolve_comment` records the commit in its result, not in the store.** The\n  store contract has nowhere to put a resolution's `sha` and `note`, so they are\n  returned to the agent and lost on write. Closing that needs a field on the\n  comment and a richer `setStatus`, which belongs with US2's gate rather than\n  being half-added here.\n- **Claude Code Channels**, which would let the server wake an idle session\n  instead of the agent polling. It is a research preview; the Stop hook and\n  `wait_for_comments` work everywhere today.",
+    "change": [
+      {
+        "commit": "3b2edc2",
+        "file": "packages/core/src/connectors/types.ts",
+        "diff": "@@ -10,6 +10,7 @@\n \n import type {\n   Comment,\n+  CommentResolution,\n   CommentStatus,\n   MapleUser,\n   MediaBlob,\n@@ -50,11 +51,13 @@ export interface CommentPage {\n  *\n  * `setStatus` is optional because append-only backends exist; where it is\n  * missing, Maple keeps status client-side and the CI gate degrades to neutral.\n+ * Its `resolution` records what claimed to address the comment; a store that\n+ * cannot keep it stores the status alone rather than refusing the call.\n  */\n export interface StoreConnector extends ConnectorMeta {\n   list(query: ListQuery): Promise<CommentPage>;\n   append(comment: NewComment): Promise<Comment>;\n-  setStatus?(id: string, status: CommentStatus): Promise<Comment>;\n+  setStatus?(id: string, status: CommentStatus, resolution?: CommentResolution): Promise<Comment>;\n   /** Long-poll for comments newer than `cursor`. Resolves empty on timeout. */\n   watch?(query: ListQuery, signal: AbortSignal): Promise<CommentPage>;\n }"
+      },
+      {
+        "commit": "3b2edc2",
+        "file": "packages/mcp/src/handlers.ts",
+        "diff": "@@ -100,6 +100,10 @@ export function createToolHandlers(options: HandlerOptions): ToolHandlers {\n       }\n     },\n \n+    /**\n+     * The commit and the note travel with the status. A store that cannot keep\n+     * them still records the status rather than refusing the call.\n+     */\n     async resolveComment(args): Promise<Comment> {\n       const setStatus = options.store.setStatus?.bind(options.store);\n       if (!setStatus) {\n@@ -107,7 +111,11 @@ export function createToolHandlers(options: HandlerOptions): ToolHandlers {\n           `The ${options.store.name} store cannot change a status; resolve the comment where it lives.`,\n         );\n       }\n-      return setStatus(args.id, \"resolved\");\n+      return setStatus(args.id, \"resolved\", {\n+        sha: args.sha,\n+        ...(args.note === undefined ? {} : { note: args.note }),\n+        at: new Date(now()).toISOString(),\n+      });\n     },\n \n     async getCommentContext(args): Promise<CommentContext> {"
+      }
+    ]
+  },
+  {
+    "id": "drift-052",
+    "by": "maintainer",
+    "label": "current",
+    "doc": "docs/connectors.md",
+    "at": "3b2edc2",
+    "paragraph": "`setStatus` takes an optional third argument, a `CommentResolution` — the commit\nan agent says addressed the comment, an optional note, and the time the write\nhappened. A store that cannot keep it records the status alone; it never refuses\nthe call, because the status is the part the gate reads.",
+    "change": [
+      {
+        "commit": "3b2edc2",
+        "file": "packages/core/src/connectors/types.ts",
+        "diff": "@@ -10,6 +10,7 @@\n \n import type {\n   Comment,\n+  CommentResolution,\n   CommentStatus,\n   MapleUser,\n   MediaBlob,\n@@ -50,11 +51,13 @@ export interface CommentPage {\n  *\n  * `setStatus` is optional because append-only backends exist; where it is\n  * missing, Maple keeps status client-side and the CI gate degrades to neutral.\n+ * Its `resolution` records what claimed to address the comment; a store that\n+ * cannot keep it stores the status alone rather than refusing the call.\n  */\n export interface StoreConnector extends ConnectorMeta {\n   list(query: ListQuery): Promise<CommentPage>;\n   append(comment: NewComment): Promise<Comment>;\n-  setStatus?(id: string, status: CommentStatus): Promise<Comment>;\n+  setStatus?(id: string, status: CommentStatus, resolution?: CommentResolution): Promise<Comment>;\n   /** Long-poll for comments newer than `cursor`. Resolves empty on timeout. */\n   watch?(query: ListQuery, signal: AbortSignal): Promise<CommentPage>;\n }"
+      },
+      {
+        "commit": "3b2edc2",
+        "file": "packages/mcp/src/handlers.ts",
+        "diff": "@@ -100,6 +100,10 @@ export function createToolHandlers(options: HandlerOptions): ToolHandlers {\n       }\n     },\n \n+    /**\n+     * The commit and the note travel with the status. A store that cannot keep\n+     * them still records the status rather than refusing the call.\n+     */\n     async resolveComment(args): Promise<Comment> {\n       const setStatus = options.store.setStatus?.bind(options.store);\n       if (!setStatus) {\n@@ -107,7 +111,11 @@ export function createToolHandlers(options: HandlerOptions): ToolHandlers {\n           `The ${options.store.name} store cannot change a status; resolve the comment where it lives.`,\n         );\n       }\n-      return setStatus(args.id, \"resolved\");\n+      return setStatus(args.id, \"resolved\", {\n+        sha: args.sha,\n+        ...(args.note === undefined ? {} : { note: args.note }),\n+        at: new Date(now()).toISOString(),\n+      });\n     },\n \n     async getCommentContext(args): Promise<CommentContext> {"
+      }
+    ]
+  },
+  {
+    "id": "drift-053",
+    "by": "maintainer",
+    "label": "stale",
+    "doc": "README.md",
+    "at": "5fa446b",
+    "paragraph": "The product is Maple, the binary is `maple`, and the packages are `@maplekit/*`\nbecause `maple` on npm is taken.",
+    "change": [
+      {
+        "commit": "9f926d6",
+        "file": "packages/core/package.json",
+        "diff": "@@ -1,5 +1,5 @@\n {\n-  \"name\": \"@maplekit/core\",\n+  \"name\": \"@maple-kit/core\",\n   \"version\": \"0.0.0\",\n   \"description\": \"Server SDK, overlay and connector contracts for Maple\",\n   \"license\": \"Apache-2.0\","
+      }
+    ]
+  },
+  {
+    "id": "drift-054",
+    "by": "maintainer",
+    "label": "current",
+    "doc": "README.md",
+    "at": "9f926d6",
+    "paragraph": "The product is Maple, the binary is `maple`, and the packages are `@maple-kit/*`\nbecause `maple` on npm is taken.",
+    "change": [
+      {
+        "commit": "9f926d6",
+        "file": "packages/core/package.json",
+        "diff": "@@ -1,5 +1,5 @@\n {\n-  \"name\": \"@maplekit/core\",\n+  \"name\": \"@maple-kit/core\",\n   \"version\": \"0.0.0\",\n   \"description\": \"Server SDK, overlay and connector contracts for Maple\",\n   \"license\": \"Apache-2.0\","
+      }
+    ]
+  },
+  {
+    "id": "drift-055",
+    "by": "maintainer",
+    "label": "stale",
+    "doc": "docs/connectors.md",
+    "at": "5fa446b",
+    "paragraph": "The reference connector lives in `@maplekit/core/testing` and exists so the\ncontract suite has something to run against. It is not for production.",
+    "change": [
+      {
+        "commit": "9f926d6",
+        "file": "packages/core/package.json",
+        "diff": "@@ -1,5 +1,5 @@\n {\n-  \"name\": \"@maplekit/core\",\n+  \"name\": \"@maple-kit/core\",\n   \"version\": \"0.0.0\",\n   \"description\": \"Server SDK, overlay and connector contracts for Maple\",\n   \"license\": \"Apache-2.0\","
+      }
+    ]
+  },
+  {
+    "id": "drift-056",
+    "by": "maintainer",
+    "label": "current",
+    "doc": "docs/connectors.md",
+    "at": "9f926d6",
+    "paragraph": "The reference connector lives in `@maple-kit/core/testing` and exists so the\ncontract suite has something to run against. It is not for production.",
+    "change": [
+      {
+        "commit": "9f926d6",
+        "file": "packages/core/package.json",
+        "diff": "@@ -1,5 +1,5 @@\n {\n-  \"name\": \"@maplekit/core\",\n+  \"name\": \"@maple-kit/core\",\n   \"version\": \"0.0.0\",\n   \"description\": \"Server SDK, overlay and connector contracts for Maple\",\n   \"license\": \"Apache-2.0\","
+      }
+    ]
+  },
+  {
+    "id": "drift-057",
+    "by": "maintainer",
+    "label": "stale",
+    "doc": "docs/mock.md",
+    "at": "cc81f1c",
+    "paragraph": "- **`long`** makes every text as long as the page could really receive: to its\n  `maxLength` exactly, else four times over (at least 32 characters), half of\n  it the value's own words repeated so it wraps, half one unbroken run of its\n  characters for `overflow-wrap`. An address grows its local part (at most 64\n  characters) and a URL a path segment after its origin, so both still parse.\n  A number goes to 1,234,567, never past its schema's bound. Identifiers,\n  references (`ownerId`), cursors, enums, `const`, `pattern`, dates, UUIDs\n  and colours are left alone, as is every superjson-typed value. Lists keep\n  their length.\n- **`sparse`** makes everything that may be missing missing. With a schema, a\n  nullable field is `null` and an optional one is gone. Without one, only what\n  the recording proves is dropped: a key one item of a list lacks is dropped\n  from every item, a key one item holds `null` is `null` in every item. A lone\n  object has nothing to prove anything with, and is left alone.\n- **`mixed`** covers every combination that matters instead of adding items.\n  Each field rotates through what it may be (every enum value, both booleans,\n  null and set, absent and present, short and long text), the rotations side\n  by side, so the list grows only to the longest rotation, never to a cross\n  product, and at most to fifty or `maxItems`. A count is kept. A field set\n  where no item holds a value borrows another item's, else samples its schema.",
+    "change": [
+      {
+        "commit": "111360f",
+        "file": "packages/mock/src/states/long.ts",
+        "diff": "@@ -1,8 +1,9 @@\n /**\n  * `long`: every text as long as the page could really receive, and every\n- * number at its widest. Each longer text is built from its own value, half of\n- * it wrapping words and half one unbroken run, so both wrapping and\n- * `overflow-wrap` are exercised. Lists keep their length.\n+ * number at its widest. Each longer text is built from its own value in the\n+ * shape it already has: words wrap, and only a name that is already one\n+ * unbroken run (a slug, a branch, an address, a URL) grows as one, for\n+ * `overflow-wrap`. Lists keep their length.\n  */\n \n import { arrayOf, enumOf, property, typesOf, valueBranch } from \"../schema/json-schema.js\";\n@@ -36,6 +37,7 @@ const UUID = /^[\\da-f]{8}-[\\da-f]{4}-[\\da-f]{4}-[\\da-f]{4}-[\\da-f]{12}$/i;\n const COLOR = /^#[\\da-f]{3,8}$/i;\n const TOKEN = /^[a-z][\\d_a-z-]{0,15}$/;\n const URL_LIKE = /^https?:\\/\\/\\S+$/i;\n+const JOINED = /\\w[./_-]\\w/;\n \n /** `value` with every text lengthened and every number widened. */\n export function lengthen(value: unknown, at?: Located, depth = 0): unknown {"
+      }
+    ]
+  },
+  {
+    "id": "drift-058",
+    "by": "maintainer",
+    "label": "current",
+    "doc": "docs/mock.md",
+    "at": "111360f",
+    "paragraph": "- **`long`** makes every text as long as the page could really receive: to its\n  `maxLength` exactly, else four times over (at least 32 characters), in the\n  shape the value already has, so the page looks like it received a long\n  value rather than like it broke. Words repeat with a space between, so they\n  wrap, and without a `maxLength` a text ends on a whole word. Only a value that is already one unbroken run grows as one, for\n  `overflow-wrap`: a slug or a branch (`fix/chart`) by its own words after a\n  dash, an address by its local part (at most 64 characters) and a URL by a\n  path segment after its origin, so both still parse.\n  A number goes to 1,234,567, never past its schema's bound. Identifiers,\n  references (`ownerId`), cursors, enums, `const`, `pattern`, dates, UUIDs\n  and colours are left alone, as is every superjson-typed value. Lists keep\n  their length.\n- **`sparse`** makes everything that may be missing missing. With a schema, a\n  nullable field is `null` and an optional one is gone. Without one, only what\n  the recording proves is dropped: a key one item of a list lacks is dropped\n  from every item, a key one item holds `null` is `null` in every item. A lone\n  object has nothing to prove anything with, and is left alone.\n- **`mixed`** covers every combination that matters instead of adding items.\n  Each field rotates through what it may be (every enum value, both booleans,\n  null and set, absent and present, short and long text), the rotations side\n  by side, so the list grows only to the longest rotation, never to a cross\n  product, and at most to fifty or `maxItems`. A count is kept. A field set\n  where no item holds a value borrows another item's, else samples its schema.",
+    "change": [
+      {
+        "commit": "111360f",
+        "file": "packages/mock/src/states/long.ts",
+        "diff": "@@ -1,8 +1,9 @@\n /**\n  * `long`: every text as long as the page could really receive, and every\n- * number at its widest. Each longer text is built from its own value, half of\n- * it wrapping words and half one unbroken run, so both wrapping and\n- * `overflow-wrap` are exercised. Lists keep their length.\n+ * number at its widest. Each longer text is built from its own value in the\n+ * shape it already has: words wrap, and only a name that is already one\n+ * unbroken run (a slug, a branch, an address, a URL) grows as one, for\n+ * `overflow-wrap`. Lists keep their length.\n  */\n \n import { arrayOf, enumOf, property, typesOf, valueBranch } from \"../schema/json-schema.js\";\n@@ -36,6 +37,7 @@ const UUID = /^[\\da-f]{8}-[\\da-f]{4}-[\\da-f]{4}-[\\da-f]{4}-[\\da-f]{12}$/i;\n const COLOR = /^#[\\da-f]{3,8}$/i;\n const TOKEN = /^[a-z][\\d_a-z-]{0,15}$/;\n const URL_LIKE = /^https?:\\/\\/\\S+$/i;\n+const JOINED = /\\w[./_-]\\w/;\n \n /** `value` with every text lengthened and every number widened. */\n export function lengthen(value: unknown, at?: Located, depth = 0): unknown {"
+      }
+    ]
+  },
+  {
+    "id": "drift-059",
+    "by": "maintainer",
+    "label": "stale",
+    "doc": "docs/gate.md",
+    "at": "c1b571b",
+    "paragraph": "Not built yet. Recorded here so the next person does not rediscover it:",
+    "change": [
+      {
+        "commit": "fbe201b",
+        "file": "packages/core/src/connectors/github-gate.ts",
+        "diff": "@@ -0,0 +1,217 @@\n+/**\n+ * The GitHub gate: `maple/visual-review`, a check run held open while comments\n+ * are open.\n+ *\n+ * Only a GitHub App can create a check run, and this one authenticates as\n+ * itself. It never sees a reviewer's token; `docs/github-auth.md` says why\n+ * that has to be a second App.\n+ */\n+\n+import type { GateConclusion, GateReason, GateVerdict } from \"../types.js\";\n+import type { GateConnector, GateReport, GateTarget } from \"./types.js\";\n+\n+/** Everything the gate needs to reach a repository. */\n+export interface GitHubGateOptions {\n+  readonly owner: string;\n+  readonly repo: string;\n+  /**\n+   * An installation token for the gate's own App. Never a reviewer's token:\n+   * read it from the environment at the call site.\n+   */\n+  readonly token: string;\n+  /** Defaults to `https://api.github.com`. Set this for Enterprise Server. */\n+  readonly baseUrl?: string;\n+  /** Injected in tests. Defaults to the global `fetch`. */\n+  readonly fetch?: typeof globalThis.fetch;\n+  /**\n+   * The check's name, which is what a ruleset requires. Changing it makes the\n+   * old name a required check nothing ever reports on again.\n+   */\n+  readonly name?: string;\n+}\n+\n+/** The name a branch-protection ruleset requires. */\n+export const CHECK_NAME = \"maple/visual-review\";\n+\n+const DEFAULT_BASE = \"https://api.github.com\";\n+\n+/** Creates a gate connector backed by a check run. */\n+export function githubGate(options: GitHubGateOptions): GateConnector {\n+  const api = createClient(options);\n+\n+  return {\n+    name: \"github\",\n+    publish: (report) => publish(api, report),\n+    read: (target) => read(api, target),\n+  };\n+}\n+\n+/** The narrow GitHub client the rest of this file is written against. */\n+interface Client {\n+  readonly options: GitHubGateOptions;\n+  readonly check: string;\n+  request<T>(path: string, init?: RequestInit): Promise<T>;\n+}\n+\n+/** One check run, trimmed to what this connector reads. */\n+interface CheckRun {\n+  readonly id: number;\n+  readonly status: string;\n+  readonly conclusion: string | null;\n+  readonly external_id: string | null;\n+  readonly output: { readonly title: string | null; readonly summary: string | null } | null;\n+}\n+\n+function createClient(options: GitHubGateOptions): Client {\n+  const base = options.baseUrl ?? DEFAULT_BASE;\n+  const call = options.fetch ?? globalThis.fetch;\n+\n+  return {\n+    options,\n+    check: options.name ?? CHECK_NAME,\n+    async request<T>(path: string, init: RequestInit = {}): Promise<T> {\n+      const response = await call(`${base}${path}`, {\n+        ...init,\n+        headers: {\n+          accept: \"application/vnd.github+json\",\n+          authorization: `Bearer ${options.token}`,\n+          \"x-github-api-version\": \"2022-11-28\",\n+          ...(init.body === undefined ? {} : { \"content-type\": \"application/json\" }),\n+          ...init.headers,\n+        },\n+      });\n+\n+      if (!response.ok) throw await failure(response, path);\n+      return (await response.json()) as T;\n+    },\n+  };\n+}\n+\n+/** GitHub's message, not ours; a caller deciding what to retry needs it. */\n+async function failure(response: Response, path: string): Promise<Error> {\n+  const detail = await response.text().catch(() => \"\");\n+  const parsed: unknown = detail ? safeJson(detail) : undefined;\n+  const message =\n+    typeof parsed === \"object\" && parsed !== null && \"message\" in parsed\n+      ? String(parsed.message)\n+      : detail || response.statusText;\n+\n+  return new Error(`GitHub ${String(response.status)} on ${path}: ${message}`);\n+}\n+\n+function safeJson(text: string): unknown {\n+  try {\n+    return JSON.parse(text);\n+  } catch {\n+    return undefined;\n+  }\n+}\n+\n+/**\n+ * Updates the run in flight, or posts a new one. A completed run is never\n+ * reopened: a new run under the same name and SHA supersedes it.\n+ */\n+async function publish(api: Client, report: GateReport): Promise<void> {\n+  const existing = await latest(api, report);\n+  const body = JSON.stringify(payload(api, report));\n+\n+  if (existing && existing.status !== \"completed\") {\n+    await api.request(`${repoPath(api)}/check-runs/${String(existing.id)}`, {\n+      method: \"PATCH\",\n+      body,\n+    });\n+    return;\n+  }\n+\n+  await api.request(`${repoPath(api)}/check-runs`, { method: \"POST\", body });\n+}\n+\n+/** What the verdict looks like as a check run. */\n+function payload(api: Client, report: GateReport): Record<string, unknown> {\n+  const now = new Date().toISOString();\n+  const blocked = report.verdict.conclusion === \"blocked\";\n+\n+  return {\n+    name: api.check,\n+    head_sha: report.sha,\n+    external_id: externalId(report.verdict),\n+    started_at: now,\n+    ...(blocked\n+      ? { status: \"in_progress\" }\n+      : {\n+          status: \"completed\",\n+          conclusion: concluded(report.verdict.conclusion),\n+          completed_at: now,\n+        }),\n+    ...(report.reviewUrl === undefined ? {} : { details_url: report.reviewUrl }),\n+    output: { title: report.verdict.title, summary: report.verdict.summary },\n+  };\n+}\n+\n+/**\n+ * A required check passes only on success, skipped or neutral, so a blocked\n+ * commit never reaches here: docs/gate.md says why it stays `in_progress`.\n+ */\n+function concluded(conclusion: GateConclusion): string {\n+  return conclusion === \"clear\" ? \"success\" : \"neutral\";\n+}\n+\n+async function read(api: Client, target: GateTarget): Promise<GateVerdict | undefined> {\n+  const run = await latest(api, target);\n+  if (!run) return undefined;\n+\n+  const counts = countsIn(run.external_id);\n+  return {\n+    conclusion: conclusionOf(run),\n+    reason: counts.reason,\n+    title: run.output?.title ?? \"\",\n+    summary: run.output?.summary ?? \"\",\n+    open: counts.open,\n+    total: counts.total,\n+  };\n+}\n+\n+/** The most recent run under this check's name on this commit, if any. */\n+async function latest(api: Client, target: GateTarget): Promise<CheckRun | undefined> {\n+  const path = `${repoPath(api)}/commits/${target.sha}/check-runs?check_name=${encodeURIComponent(api.check)}&filter=latest`;\n+  const { check_runs } = await api.request<{ check_runs: CheckRun[] }>(path);\n+  return check_runs[0];\n+}\n+\n+function conclusionOf(run: CheckRun): GateConclusion {\n+  if (run.status !== \"completed\") return \"blocked\";\n+  return run.conclusion === \"success\" ? \"clear\" : \"neutral\";\n+}\n+\n+/**\n+ * The counts ride in `external_id`, the field the API reserves for exactly\n+ * this. Reading them back out of the markdown summary would be parsing prose.\n+ */\n+function externalId(verdict: GateVerdict): string {\n+  return JSON.stringify({ r: verdict.reason, o: verdict.open, t: verdict.total });\n+}\n+\n+interface Counts {\n+  readonly reason: GateReason;\n+  readonly open: number;\n+  readonly total: number;\n+}\n+\n+/** A run somebody else's tooling created carries no counts; say zero, not a guess. */\n+function countsIn(externalId: string | null): Counts {\n+  const parsed = externalId === null ? undefined : safeJson(externalId);\n+  if (typeof parsed !== \"object\" || parsed === null) {\n+    return { reason: \"unreadable\", open: 0, total: 0 };\n+  }\n+\n+  const held = parsed as Record<string, unknown>;\n+  return {\n+    reason: typeof held[\"r\"] === \"string\" ? (held[\"r\"] as GateReason) : \"unreadable\",\n+    open: typeof held[\"o\"] === \"number\" ? held[\"o\"] : 0,\n+    total: typeof held[\"t\"] === \"number\" ? held[\"t\"] : 0,\n+  };\n+}\n+\n+function repoPath(api: Client): string {\n+  return `/repos/${api.options.owner}/${api.options.repo}`;\n+}"
+      }
+    ]
+  },
+  {
+    "id": "drift-060",
+    "by": "maintainer",
+    "label": "current",
+    "doc": "docs/gate.md",
+    "at": "82d2080",
+    "paragraph": "`githubGate` in `@maple-kit/core/connectors` was built in #56, and\n`maple-action` calls it. What follows is why each part is the way it is, so\nnobody rediscovers it by breaking it.",
+    "change": [
+      {
+        "commit": "fbe201b",
+        "file": "packages/core/src/connectors/github-gate.ts",
+        "diff": "@@ -0,0 +1,217 @@\n+/**\n+ * The GitHub gate: `maple/visual-review`, a check run held open while comments\n+ * are open.\n+ *\n+ * Only a GitHub App can create a check run, and this one authenticates as\n+ * itself. It never sees a reviewer's token; `docs/github-auth.md` says why\n+ * that has to be a second App.\n+ */\n+\n+import type { GateConclusion, GateReason, GateVerdict } from \"../types.js\";\n+import type { GateConnector, GateReport, GateTarget } from \"./types.js\";\n+\n+/** Everything the gate needs to reach a repository. */\n+export interface GitHubGateOptions {\n+  readonly owner: string;\n+  readonly repo: string;\n+  /**\n+   * An installation token for the gate's own App. Never a reviewer's token:\n+   * read it from the environment at the call site.\n+   */\n+  readonly token: string;\n+  /** Defaults to `https://api.github.com`. Set this for Enterprise Server. */\n+  readonly baseUrl?: string;\n+  /** Injected in tests. Defaults to the global `fetch`. */\n+  readonly fetch?: typeof globalThis.fetch;\n+  /**\n+   * The check's name, which is what a ruleset requires. Changing it makes the\n+   * old name a required check nothing ever reports on again.\n+   */\n+  readonly name?: string;\n+}\n+\n+/** The name a branch-protection ruleset requires. */\n+export const CHECK_NAME = \"maple/visual-review\";\n+\n+const DEFAULT_BASE = \"https://api.github.com\";\n+\n+/** Creates a gate connector backed by a check run. */\n+export function githubGate(options: GitHubGateOptions): GateConnector {\n+  const api = createClient(options);\n+\n+  return {\n+    name: \"github\",\n+    publish: (report) => publish(api, report),\n+    read: (target) => read(api, target),\n+  };\n+}\n+\n+/** The narrow GitHub client the rest of this file is written against. */\n+interface Client {\n+  readonly options: GitHubGateOptions;\n+  readonly check: string;\n+  request<T>(path: string, init?: RequestInit): Promise<T>;\n+}\n+\n+/** One check run, trimmed to what this connector reads. */\n+interface CheckRun {\n+  readonly id: number;\n+  readonly status: string;\n+  readonly conclusion: string | null;\n+  readonly external_id: string | null;\n+  readonly output: { readonly title: string | null; readonly summary: string | null } | null;\n+}\n+\n+function createClient(options: GitHubGateOptions): Client {\n+  const base = options.baseUrl ?? DEFAULT_BASE;\n+  const call = options.fetch ?? globalThis.fetch;\n+\n+  return {\n+    options,\n+    check: options.name ?? CHECK_NAME,\n+    async request<T>(path: string, init: RequestInit = {}): Promise<T> {\n+      const response = await call(`${base}${path}`, {\n+        ...init,\n+        headers: {\n+          accept: \"application/vnd.github+json\",\n+          authorization: `Bearer ${options.token}`,\n+          \"x-github-api-version\": \"2022-11-28\",\n+          ...(init.body === undefined ? {} : { \"content-type\": \"application/json\" }),\n+          ...init.headers,\n+        },\n+      });\n+\n+      if (!response.ok) throw await failure(response, path);\n+      return (await response.json()) as T;\n+    },\n+  };\n+}\n+\n+/** GitHub's message, not ours; a caller deciding what to retry needs it. */\n+async function failure(response: Response, path: string): Promise<Error> {\n+  const detail = await response.text().catch(() => \"\");\n+  const parsed: unknown = detail ? safeJson(detail) : undefined;\n+  const message =\n+    typeof parsed === \"object\" && parsed !== null && \"message\" in parsed\n+      ? String(parsed.message)\n+      : detail || response.statusText;\n+\n+  return new Error(`GitHub ${String(response.status)} on ${path}: ${message}`);\n+}\n+\n+function safeJson(text: string): unknown {\n+  try {\n+    return JSON.parse(text);\n+  } catch {\n+    return undefined;\n+  }\n+}\n+\n+/**\n+ * Updates the run in flight, or posts a new one. A completed run is never\n+ * reopened: a new run under the same name and SHA supersedes it.\n+ */\n+async function publish(api: Client, report: GateReport): Promise<void> {\n+  const existing = await latest(api, report);\n+  const body = JSON.stringify(payload(api, report));\n+\n+  if (existing && existing.status !== \"completed\") {\n+    await api.request(`${repoPath(api)}/check-runs/${String(existing.id)}`, {\n+      method: \"PATCH\",\n+      body,\n+    });\n+    return;\n+  }\n+\n+  await api.request(`${repoPath(api)}/check-runs`, { method: \"POST\", body });\n+}\n+\n+/** What the verdict looks like as a check run. */\n+function payload(api: Client, report: GateReport): Record<string, unknown> {\n+  const now = new Date().toISOString();\n+  const blocked = report.verdict.conclusion === \"blocked\";\n+\n+  return {\n+    name: api.check,\n+    head_sha: report.sha,\n+    external_id: externalId(report.verdict),\n+    started_at: now,\n+    ...(blocked\n+      ? { status: \"in_progress\" }\n+      : {\n+          status: \"completed\",\n+          conclusion: concluded(report.verdict.conclusion),\n+          completed_at: now,\n+        }),\n+    ...(report.reviewUrl === undefined ? {} : { details_url: report.reviewUrl }),\n+    output: { title: report.verdict.title, summary: report.verdict.summary },\n+  };\n+}\n+\n+/**\n+ * A required check passes only on success, skipped or neutral, so a blocked\n+ * commit never reaches here: docs/gate.md says why it stays `in_progress`.\n+ */\n+function concluded(conclusion: GateConclusion): string {\n+  return conclusion === \"clear\" ? \"success\" : \"neutral\";\n+}\n+\n+async function read(api: Client, target: GateTarget): Promise<GateVerdict | undefined> {\n+  const run = await latest(api, target);\n+  if (!run) return undefined;\n+\n+  const counts = countsIn(run.external_id);\n+  return {\n+    conclusion: conclusionOf(run),\n+    reason: counts.reason,\n+    title: run.output?.title ?? \"\",\n+    summary: run.output?.summary ?? \"\",\n+    open: counts.open,\n+    total: counts.total,\n+  };\n+}\n+\n+/** The most recent run under this check's name on this commit, if any. */\n+async function latest(api: Client, target: GateTarget): Promise<CheckRun | undefined> {\n+  const path = `${repoPath(api)}/commits/${target.sha}/check-runs?check_name=${encodeURIComponent(api.check)}&filter=latest`;\n+  const { check_runs } = await api.request<{ check_runs: CheckRun[] }>(path);\n+  return check_runs[0];\n+}\n+\n+function conclusionOf(run: CheckRun): GateConclusion {\n+  if (run.status !== \"completed\") return \"blocked\";\n+  return run.conclusion === \"success\" ? \"clear\" : \"neutral\";\n+}\n+\n+/**\n+ * The counts ride in `external_id`, the field the API reserves for exactly\n+ * this. Reading them back out of the markdown summary would be parsing prose.\n+ */\n+function externalId(verdict: GateVerdict): string {\n+  return JSON.stringify({ r: verdict.reason, o: verdict.open, t: verdict.total });\n+}\n+\n+interface Counts {\n+  readonly reason: GateReason;\n+  readonly open: number;\n+  readonly total: number;\n+}\n+\n+/** A run somebody else's tooling created carries no counts; say zero, not a guess. */\n+function countsIn(externalId: string | null): Counts {\n+  const parsed = externalId === null ? undefined : safeJson(externalId);\n+  if (typeof parsed !== \"object\" || parsed === null) {\n+    return { reason: \"unreadable\", open: 0, total: 0 };\n+  }\n+\n+  const held = parsed as Record<string, unknown>;\n+  return {\n+    reason: typeof held[\"r\"] === \"string\" ? (held[\"r\"] as GateReason) : \"unreadable\",\n+    open: typeof held[\"o\"] === \"number\" ? held[\"o\"] : 0,\n+    total: typeof held[\"t\"] === \"number\" ? held[\"t\"] : 0,\n+  };\n+}\n+\n+function repoPath(api: Client): string {\n+  return `/repos/${api.options.owner}/${api.options.repo}`;\n+}"
+      }
+    ]
+  },
+  {
+    "id": "drift-061",
+    "by": "maintainer",
+    "label": "stale",
+    "doc": "docs/tagger.md",
+    "at": "473898c",
+    "paragraph": "**Status:** the transform is implemented in `@maple-kit/core/tagger`. The Vite\nplugin and the Next loader that mount it are not yet.",
+    "change": [
+      {
+        "commit": "8dd0e2e",
+        "file": "packages/core/package.json",
+        "diff": "@@ -23,10 +23,12 @@\n     \"./connectors\": \"./dist/connectors/index.js\",\n     \"./export\": \"./dist/export/index.js\",\n     \"./logger\": \"./dist/logger/index.js\",\n+    \"./loader\": \"./dist/loader/index.js\",\n     \"./config\": \"./dist/config/index.js\",\n     \"./overlay\": \"./dist/overlay/index.js\",\n     \"./tagger\": \"./dist/tagger/index.js\",\n     \"./testing\": \"./dist/testing/index.js\",\n+    \"./vite\": \"./dist/vite/index.js\",\n     \"./package.json\": \"./package.json\"\n   },\n   \"scripts\": {"
+      },
+      {
+        "commit": "8dd0e2e",
+        "file": "packages/core/src/vite/index.ts",
+        "diff": "@@ -0,0 +1,45 @@\n+/**\n+ * The Vite plugin.\n+ *\n+ * Vite is the easy target: one plugin and nothing else. The plugin's shape is\n+ * described structurally rather than imported, so `@maple-kit/core` does not\n+ * take a dependency on Vite to type a five-field object.\n+ */\n+\n+import { isTaggable, tagSource } from \"../tagger/transform.js\";\n+\n+/** The part of Vite's plugin interface this uses. */\n+export interface VitePluginLike {\n+  readonly name: string;\n+  readonly enforce?: \"post\" | \"pre\";\n+  transform?(code: string, id: string): Promise<{ code: string; map?: unknown } | undefined>;\n+}\n+\n+/** How the plugin behaves. */\n+export interface MapleViteOptions {\n+  /**\n+   * Whether to emit `data-maple-src` and `data-maple-name`. Defaults to false,\n+   * so a production build is correct when the flag is forgotten.\n+   */\n+  readonly tagger?: boolean;\n+  /** Directory emitted paths are relative to. Defaults to the working directory. */\n+  readonly root?: string;\n+}\n+\n+/** Mounts Maple into a Vite build. */\n+export function maple(options: MapleViteOptions = {}): VitePluginLike {\n+  const tagger = options.tagger ?? false;\n+\n+  return {\n+    name: \"maple\",\n+    enforce: \"pre\",\n+    async transform(code: string, id: string) {\n+      if (!tagger || !isTaggable(id)) return undefined;\n+      return tagSource(code, id.split(\"?\")[0] ?? id, root(options));\n+    },\n+  };\n+}\n+\n+function root(options: MapleViteOptions): { root?: string } {\n+  return options.root === undefined ? {} : { root: options.root };\n+}"
+      }
+    ]
+  },
+  {
+    "id": "drift-062",
+    "by": "maintainer",
+    "label": "current",
+    "doc": "docs/tagger.md",
+    "at": "8dd0e2e",
+    "paragraph": "**Status:** implemented. The transform is `@maple-kit/core/tagger`, the Vite\nplugin is `@maple-kit/core/vite`, the Next loader is `@maple-kit/core/loader`,\nand `examples/vite-app` and `examples/next-app` assert on their own build output.",
+    "change": [
+      {
+        "commit": "8dd0e2e",
+        "file": "packages/core/package.json",
+        "diff": "@@ -23,10 +23,12 @@\n     \"./connectors\": \"./dist/connectors/index.js\",\n     \"./export\": \"./dist/export/index.js\",\n     \"./logger\": \"./dist/logger/index.js\",\n+    \"./loader\": \"./dist/loader/index.js\",\n     \"./config\": \"./dist/config/index.js\",\n     \"./overlay\": \"./dist/overlay/index.js\",\n     \"./tagger\": \"./dist/tagger/index.js\",\n     \"./testing\": \"./dist/testing/index.js\",\n+    \"./vite\": \"./dist/vite/index.js\",\n     \"./package.json\": \"./package.json\"\n   },\n   \"scripts\": {"
+      },
+      {
+        "commit": "8dd0e2e",
+        "file": "packages/core/src/vite/index.ts",
+        "diff": "@@ -0,0 +1,45 @@\n+/**\n+ * The Vite plugin.\n+ *\n+ * Vite is the easy target: one plugin and nothing else. The plugin's shape is\n+ * described structurally rather than imported, so `@maple-kit/core` does not\n+ * take a dependency on Vite to type a five-field object.\n+ */\n+\n+import { isTaggable, tagSource } from \"../tagger/transform.js\";\n+\n+/** The part of Vite's plugin interface this uses. */\n+export interface VitePluginLike {\n+  readonly name: string;\n+  readonly enforce?: \"post\" | \"pre\";\n+  transform?(code: string, id: string): Promise<{ code: string; map?: unknown } | undefined>;\n+}\n+\n+/** How the plugin behaves. */\n+export interface MapleViteOptions {\n+  /**\n+   * Whether to emit `data-maple-src` and `data-maple-name`. Defaults to false,\n+   * so a production build is correct when the flag is forgotten.\n+   */\n+  readonly tagger?: boolean;\n+  /** Directory emitted paths are relative to. Defaults to the working directory. */\n+  readonly root?: string;\n+}\n+\n+/** Mounts Maple into a Vite build. */\n+export function maple(options: MapleViteOptions = {}): VitePluginLike {\n+  const tagger = options.tagger ?? false;\n+\n+  return {\n+    name: \"maple\",\n+    enforce: \"pre\",\n+    async transform(code: string, id: string) {\n+      if (!tagger || !isTaggable(id)) return undefined;\n+      return tagSource(code, id.split(\"?\")[0] ?? id, root(options));\n+    },\n+  };\n+}\n+\n+function root(options: MapleViteOptions): { root?: string } {\n+  return options.root === undefined ? {} : { root: options.root };\n+}"
+      }
+    ]
+  },
+  {
+    "id": "drift-063",
+    "by": "maintainer",
+    "label": "stale",
+    "doc": "README.md",
+    "at": "24adb84",
+    "paragraph": "There are four kinds — store, media, observability and identity — and a\nconnector's capabilities are exactly the methods it defines. See\n[`docs/connectors.md`](docs/connectors.md).",
+    "change": [
+      {
+        "commit": "64eabf6",
+        "file": "packages/core/src/connectors/types.ts",
+        "diff": "@@ -19,8 +19,9 @@ import type {\n   NewComment,\n } from \"../types.js\";\n \n-/** The five kinds of backend Maple knows how to talk to. */\n-export type ConnectorKind = \"store\" | \"media\" | \"observability\" | \"identity\" | \"gate\";\n+/** The six kinds of backend Maple knows how to talk to. */\n+export type ConnectorKind =\n+  \"classifier\" | \"gate\" | \"identity\" | \"media\" | \"observability\" | \"store\";\n \n /** Fields every connector carries, whatever its kind. */\n export interface ConnectorMeta {"
+      }
+    ]
+  },
+  {
+    "id": "drift-064",
+    "by": "maintainer",
+    "label": "current",
+    "doc": "README.md",
+    "at": "1e7580a",
+    "paragraph": "There are six kinds — store, media, observability, identity, gate and\nclassifier — and a connector's capabilities are exactly the methods it defines.\nRun `maple connectors` to print the matrix from the code, or see\n[`docs/connectors.md`](docs/connectors.md).",
+    "change": [
+      {
+        "commit": "64eabf6",
+        "file": "packages/core/src/connectors/types.ts",
+        "diff": "@@ -19,8 +19,9 @@ import type {\n   NewComment,\n } from \"../types.js\";\n \n-/** The five kinds of backend Maple knows how to talk to. */\n-export type ConnectorKind = \"store\" | \"media\" | \"observability\" | \"identity\" | \"gate\";\n+/** The six kinds of backend Maple knows how to talk to. */\n+export type ConnectorKind =\n+  \"classifier\" | \"gate\" | \"identity\" | \"media\" | \"observability\" | \"store\";\n \n /** Fields every connector carries, whatever its kind. */\n export interface ConnectorMeta {"
+      }
+    ]
+  },
+  {
+    "id": "drift-065",
+    "by": "maintainer",
+    "label": "current",
+    "doc": "docs/mock.md",
+    "at": "1b2b4ae",
+    "paragraph": "**A banner is on while a mock is**, naming the first call and counting the\nrest. It has Edit and Turn off and no dismiss: a reviewer who forgets a mock is\non reads mocked data as real.",
+    "change": [
+      {
+        "commit": "45d5ea0",
+        "file": "packages/ui/src/mock/css.ts",
+        "diff": "@@ -6,6 +6,8 @@\n  * a page that only mocks. Built from the token contract like every other part.\n  */\n \n+import { SHEET_BREAKPOINT_PX } from \"../tokens.js\";\n+\n /** Every rule the box and the banner need, and nothing another part owns. */\n export function mockCss(): string {\n   return [box(), suggest(), calls(), states(), foot(), banner()].join(\"\\n\\n\");\n@@ -73,7 +75,6 @@ function box(): string {\n   flex: 1 1 auto;\n   min-height: 0;\n   overflow-y: auto;\n-  overscroll-behavior: contain;\n }\n \n .mk-mock-route {"
+      }
+    ]
+  },
+  {
+    "id": "drift-066",
+    "by": "maintainer",
+    "label": "current",
+    "doc": "docs/mock.md",
+    "at": "a939399",
+    "paragraph": "- **The poll is `GET /sdk/evalx/{env}/contexts/{context}`**, or a `REPORT`\n  to `…/context`, over `fetch`, answered by an object keyed by flag key. This\n  is FDv1, the SDK's default. FDv2, which runs only when `dataSystem` is\n  passed, is not read.\n- **A named flag is answered with the largest safe version.** The SDK ignores\n  a `patch` or `delete` that is not newer than the version it holds, so no\n  real change replaces it. Its `variation` and `reason` are dropped, since\n  they describe the real evaluation.\n- **The stream is the page's `EventSource`, wrapped** while a recipe has\n  flags. A `put` is rewritten; a `patch` or `delete` of a named flag is\n  dropped; a `ping` makes the SDK poll again, which is rewritten too.\n- **The SDK caches what it is told** in `localStorage` and shows it before\n  its next poll answers, so the first load after Turn off shows the mocked\n  values until that poll does. `disableCache: true` on a preview avoids it.\n- **Evaluation events still go to LaunchDarkly**, with the mocked value.",
+    "change": [
+      {
+        "commit": "59e5de3",
+        "file": "packages/mock/src/launchdarkly/index.ts",
+        "diff": "@@ -10,7 +10,9 @@ import type { FlagValue } from \"@maple-kit/core/mock\";\n \n /** Where the SDK is pointed, when it is not at LaunchDarkly's own hosts. */\n export interface LaunchDarklyOptions {\n-  /** The SDK's `baseUri`. Defaults to `https://clientsdk.launchdarkly.com`. */\n+  /**\n+   * The SDK's `baseUri` (3.x: `baseUrl`). Absent, both SDKs' default hosts.\n+   */\n   readonly baseUri?: string;\n   /** The SDK's `streamUri`. Defaults to `https://clientstream.launchdarkly.com`. */\n   readonly streamUri?: string;\n@@ -22,24 +24,30 @@ export interface LaunchDarklyOptions {\n  */\n const HELD_VERSION = Number.MAX_SAFE_INTEGER;\n \n+/** Where each SDK polls by default: 4.x (`@launchdarkly/js-client-sdk`), then 3.x. */\n+const DEFAULT_BASES = [\"https://clientsdk.launchdarkly.com\", \"https://app.launchdarkly.com\"];\n+\n const POLL = /\\/sdk\\/evalx\\/[^/]+\\/(?:contexts\\/[^/]+|context)$/;\n const STREAM = /\\/(?:eval\\/[^/]+\\/[^/]+|ping\\/[^/]+)$/;\n \n /** LaunchDarkly's browser SDK as a flag source, for `installMock({ flags })`. */\n export function launchDarklyFlags(options: LaunchDarklyOptions = {}): FlagSource {\n-  const base = new URL(options.baseUri ?? \"https://clientsdk.launchdarkly.com\");\n+  const bases = (options.baseUri === undefined ? DEFAULT_BASES : [options.baseUri]).map(\n+    (uri) => new URL(uri),\n+  );\n   const stream = new URL(options.streamUri ?? \"https://clientstream.launchdarkly.com\");\n   return {\n     name: \"launchdarkly\",\n     claims(request) {\n       const url = new URL(request.url);\n-      return url.origin === base.origin && under(url, base) && POLL.test(url.pathname);\n+      const at = bases.some((base) => url.origin === base.origin && under(url, base));\n+      return at && POLL.test(url.pathname);\n     },\n     read: values,\n     write,\n     stream: {\n       claims(href) {\n-        const url = new URL(href, base);\n+        const url = new URL(href, bases[0]);\n         return url.origin === stream.origin && under(url, stream) && STREAM.test(url.pathname);\n       },\n       event,"
+      }
+    ]
+  },
+  {
+    "id": "drift-067",
+    "by": "maintainer",
+    "label": "current",
+    "doc": ".claude/skills/setup-maple-org/SKILL.md",
+    "at": "7c37a23",
+    "paragraph": "The store is built per request from the reviewer's own token, which is what\nmakes the comment show up under their name rather than a bot's. Returning\n`null` — nobody has linked yet — makes the route answer `401`, and the overlay\noffers **Link GitHub** rather than writing the comment as somebody else.",
+    "change": [
+      {
+        "commit": "999dfb6",
+        "file": "packages/core/src/route/handler.ts",
+        "diff": "@@ -21,9 +21,9 @@ import type {\n   IdentityRequest,\n   ListQuery,\n   MediaConnector,\n-  StoreConnector,\n } from \"../connectors/types.js\";\n import type { Logger } from \"../logger/types.js\";\n+import type { CommentStore } from \"../store.js\";\n import type {\n   Comment,\n   CommentAuthor,\n@@ -43,7 +43,7 @@ import type { GateResolver } from \"./gate.js\";\n  */\n export type StoreResolver = (\n   request: IdentityRequest,\n-) => StoreConnector | null | Promise<StoreConnector | null>;\n+) => CommentStore | null | Promise<CommentStore | null>;\n \n /**\n  * Chooses the media connector for one request, for the same reason a store is"
+      }
+    ]
+  },
+  {
+    "id": "drift-068",
+    "by": "maintainer",
+    "label": "current",
+    "doc": "packages/cli/README.md",
+    "at": "a5e0af6",
+    "paragraph": "Every command that prints a table also takes `--json`, so an agent drives it\nfrom a terminal as easily as a person does.",
+    "change": [
+      {
+        "commit": "4d32330",
+        "file": "packages/cli/src/args.ts",
+        "diff": "@@ -1,49 +1,84 @@\n /**\n- * Argument parsing.\n+ * Argument parsing, over `node:util`'s `parseArgs`.\n  *\n- * Maple's CLI surface is small and stable, so it parses its own arguments\n- * rather than taking a dependency. Everything is `--flag`, `--flag=value` or a\n- * positional; there are no single-letter clusters to disambiguate.\n+ * Every command declares its flags and whether each takes a value, which is\n+ * what lets `--owner acme` and `--owner=acme` mean the same thing, and what\n+ * turns a mistyped flag into an error rather than something silently ignored.\n  */\n \n+import { parseArgs as parseNodeArgs } from \"node:util\";\n+\n+/** Whether a flag takes a value (`--owner acme`) or stands alone (`--gate`). */\n+export type FlagType = \"boolean\" | \"string\";\n+\n+/** The flags one command accepts, by name without the leading dashes. */\n+export type FlagSpec = Readonly<Record<string, FlagType>>;\n+\n+/** The flags every command accepts. */\n+export const GLOBAL_FLAGS = {\n+  json: \"boolean\",\n+  help: \"boolean\",\n+  version: \"boolean\",\n+} as const satisfies FlagSpec;\n+\n /** A parsed command line. */\n export interface ParsedArgs {\n   /** The subcommand, or undefined when none was given. */\n   readonly command?: string;\n   /** Positional arguments after the subcommand. */\n   readonly positionals: readonly string[];\n-  /** Flags, with bare flags recorded as `true`. */\n+  /** Flags: `true` for a boolean one that was given, the value for a string one. */\n   readonly flags: Readonly<Record<string, boolean | string>>;\n }\n \n-/** Splits `--name=value` into its parts; value is true for a bare flag. */\n-function parseFlag(token: string): [string, boolean | string] {\n-  const body = token.slice(2);\n-  const equals = body.indexOf(\"=\");\n-  if (equals === -1) return [body, true];\n-  return [body.slice(0, equals), body.slice(equals + 1)];\n+/** A command line the flag spec does not allow, such as an unknown flag or a missing value. */\n+export class ArgsError extends Error {\n+  override readonly name = \"ArgsError\";\n }\n \n-/** Parses `argv` (without the node and script entries). */\n-export function parseArgs(argv: readonly string[]): ParsedArgs {\n-  const positionals: string[] = [];\n-  const flags: Record<string, boolean | string> = {};\n-\n-  for (const token of argv) {\n-    if (token.startsWith(\"--\")) {\n-      const [name, value] = parseFlag(token);\n-      flags[name] = value;\n-      continue;\n-    }\n-    positionals.push(token);\n+/**\n+ * Parses `argv` (without the node and script entries) against `spec`.\n+ *\n+ * Strict by default, throwing an {@link ArgsError} for a flag `spec` does not\n+ * declare, a string flag with no value, or a value given to a boolean flag.\n+ * With `strict: false` nothing throws, and an undeclared flag reads as boolean.\n+ */\n+export function parseArgs(\n+  argv: readonly string[],\n+  spec: FlagSpec,\n+  { strict = true }: { readonly strict?: boolean } = {},\n+): ParsedArgs {\n+  const options = Object.fromEntries(Object.entries(spec).map(([name, type]) => [name, { type }]));\n+  let parsed: { values: Record<string, unknown>; positionals: string[] };\n+  try {\n+    parsed = parseNodeArgs({ args: [...argv], options, strict, allowPositionals: true });\n+  } catch (error) {\n+    throw new ArgsError(firstSentence(error));\n   }\n \n-  const [command, ...rest] = positionals;\n+  const flags: Record<string, boolean | string> = {};\n+  for (const [name, value] of Object.entries(parsed.values)) {\n+    if (typeof value === \"string\" || typeof value === \"boolean\") flags[name] = value;\n+  }\n+  const [command, ...rest] = parsed.positionals;\n   return { ...(command === undefined ? {} : { command }), positionals: rest, flags };\n }\n \n-/** True when `flags` carries `name` set to anything other than \"false\". */\n+/** Node's own sentence naming the flag, without its advice on positionals. */\n+function firstSentence(error: unknown): string {\n+  const message = error instanceof Error ? error.message : String(error);\n+  const [sentence = message] = message.split(/\\.(?:\\s|$)/);\n+  return `${sentence}.`;\n+}\n+\n+/** The flags `spec` accepts, as a usage line: `--owner <value>, --gate`. */\n+export function describeFlags(spec: FlagSpec): string {\n+  return Object.entries(spec)\n+    .map(([name, type]) => (type === \"string\" ? `--${name} <value>` : `--${name}`))\n+    .join(\", \");\n+}\n+\n+/** True when the boolean flag `name` was given. */\n export function isSet(flags: ParsedArgs[\"flags\"], name: string): boolean {\n-  const value = flags[name];\n-  return value !== undefined && value !== \"false\";\n+  return flags[name] === true;\n }"
+      }
+    ]
+  },
+  {
+    "id": "drift-069",
+    "by": "maintainer",
+    "label": "stale",
+    "doc": "plugins/maple/skills/setup-maple-org/SKILL.md",
+    "at": "313ea05",
+    "paragraph": "The CLI does the parts of this that can be generated: `npx @maple-kit/cli@0.13.0\nsetup app --owner=acme` prints the prefilled registration URL (`--gate` for the\ngate App), `setup verify --client-id=<Iv…>` checks Device Flow, and `setup ci`\nprints the gate workflow. Flags take the `--flag=value` form only.",
+    "change": [
+      {
+        "commit": "4d32330",
+        "file": "packages/cli/src/args.ts",
+        "diff": "@@ -1,49 +1,84 @@\n /**\n- * Argument parsing.\n+ * Argument parsing, over `node:util`'s `parseArgs`.\n  *\n- * Maple's CLI surface is small and stable, so it parses its own arguments\n- * rather than taking a dependency. Everything is `--flag`, `--flag=value` or a\n- * positional; there are no single-letter clusters to disambiguate.\n+ * Every command declares its flags and whether each takes a value, which is\n+ * what lets `--owner acme` and `--owner=acme` mean the same thing, and what\n+ * turns a mistyped flag into an error rather than something silently ignored.\n  */\n \n+import { parseArgs as parseNodeArgs } from \"node:util\";\n+\n+/** Whether a flag takes a value (`--owner acme`) or stands alone (`--gate`). */\n+export type FlagType = \"boolean\" | \"string\";\n+\n+/** The flags one command accepts, by name without the leading dashes. */\n+export type FlagSpec = Readonly<Record<string, FlagType>>;\n+\n+/** The flags every command accepts. */\n+export const GLOBAL_FLAGS = {\n+  json: \"boolean\",\n+  help: \"boolean\",\n+  version: \"boolean\",\n+} as const satisfies FlagSpec;\n+\n /** A parsed command line. */\n export interface ParsedArgs {\n   /** The subcommand, or undefined when none was given. */\n   readonly command?: string;\n   /** Positional arguments after the subcommand. */\n   readonly positionals: readonly string[];\n-  /** Flags, with bare flags recorded as `true`. */\n+  /** Flags: `true` for a boolean one that was given, the value for a string one. */\n   readonly flags: Readonly<Record<string, boolean | string>>;\n }\n \n-/** Splits `--name=value` into its parts; value is true for a bare flag. */\n-function parseFlag(token: string): [string, boolean | string] {\n-  const body = token.slice(2);\n-  const equals = body.indexOf(\"=\");\n-  if (equals === -1) return [body, true];\n-  return [body.slice(0, equals), body.slice(equals + 1)];\n+/** A command line the flag spec does not allow, such as an unknown flag or a missing value. */\n+export class ArgsError extends Error {\n+  override readonly name = \"ArgsError\";\n }\n \n-/** Parses `argv` (without the node and script entries). */\n-export function parseArgs(argv: readonly string[]): ParsedArgs {\n-  const positionals: string[] = [];\n-  const flags: Record<string, boolean | string> = {};\n-\n-  for (const token of argv) {\n-    if (token.startsWith(\"--\")) {\n-      const [name, value] = parseFlag(token);\n-      flags[name] = value;\n-      continue;\n-    }\n-    positionals.push(token);\n+/**\n+ * Parses `argv` (without the node and script entries) against `spec`.\n+ *\n+ * Strict by default, throwing an {@link ArgsError} for a flag `spec` does not\n+ * declare, a string flag with no value, or a value given to a boolean flag.\n+ * With `strict: false` nothing throws, and an undeclared flag reads as boolean.\n+ */\n+export function parseArgs(\n+  argv: readonly string[],\n+  spec: FlagSpec,\n+  { strict = true }: { readonly strict?: boolean } = {},\n+): ParsedArgs {\n+  const options = Object.fromEntries(Object.entries(spec).map(([name, type]) => [name, { type }]));\n+  let parsed: { values: Record<string, unknown>; positionals: string[] };\n+  try {\n+    parsed = parseNodeArgs({ args: [...argv], options, strict, allowPositionals: true });\n+  } catch (error) {\n+    throw new ArgsError(firstSentence(error));\n   }\n \n-  const [command, ...rest] = positionals;\n+  const flags: Record<string, boolean | string> = {};\n+  for (const [name, value] of Object.entries(parsed.values)) {\n+    if (typeof value === \"string\" || typeof value === \"boolean\") flags[name] = value;\n+  }\n+  const [command, ...rest] = parsed.positionals;\n   return { ...(command === undefined ? {} : { command }), positionals: rest, flags };\n }\n \n-/** True when `flags` carries `name` set to anything other than \"false\". */\n+/** Node's own sentence naming the flag, without its advice on positionals. */\n+function firstSentence(error: unknown): string {\n+  const message = error instanceof Error ? error.message : String(error);\n+  const [sentence = message] = message.split(/\\.(?:\\s|$)/);\n+  return `${sentence}.`;\n+}\n+\n+/** The flags `spec` accepts, as a usage line: `--owner <value>, --gate`. */\n+export function describeFlags(spec: FlagSpec): string {\n+  return Object.entries(spec)\n+    .map(([name, type]) => (type === \"string\" ? `--${name} <value>` : `--${name}`))\n+    .join(\", \");\n+}\n+\n+/** True when the boolean flag `name` was given. */\n export function isSet(flags: ParsedArgs[\"flags\"], name: string): boolean {\n-  const value = flags[name];\n-  return value !== undefined && value !== \"false\";\n+  return flags[name] === true;\n }"
+      }
+    ]
+  },
+  {
+    "id": "drift-070",
+    "by": "maintainer",
+    "label": "stale",
+    "doc": "docs/drafts.md",
+    "at": "7c37a23",
+    "paragraph": "`StoreConnector.appendMany` is the optional method behind **Publish all**. A\nstore that implements it takes the whole set in one write; one that does not\ngets them one at a time from the route, which is the same result and more\ncalls. `githubStore` implements it as a single ledger repost, so four comments\nare one comment on the pull request and one notification.",
+    "change": [
+      {
+        "commit": "999dfb6",
+        "file": "packages/core/src/route/handler.ts",
+        "diff": "@@ -342,7 +345,7 @@ async function appendComment(\n     author,\n   }));\n \n-  const stored = await appendAll(store, comments);\n+  const stored = await store.appendMany(comments);\n   const branch = stored[0]?.branch;\n   if (branch !== undefined) await reportGate(options, store, request, branch);\n \n@@ -352,19 +355,6 @@ async function appendComment(\n /** The author Maple records when no identity connector named one. */\n const GUEST = { id: \"guest\", name: \"Guest\", provenance: \"guest\" } as const;\n \n-/** `appendMany` where the store has it, one at a time where it does not. */\n-async function appendAll(\n-  store: StoreConnector,\n-  comments: readonly NewComment[],\n-): Promise<readonly Comment[]> {\n-  const many = store.appendMany?.bind(store);\n-  if (many) return await many(comments);\n-\n-  const stored: Comment[] = [];\n-  for (const comment of comments) stored.push(await store.append(comment));\n-  return stored;\n-}\n-\n /** A resolved reviewer, as a comment or an approval records them. */\n function authorFor(user: MapleUser): CommentAuthor {\n   return {"
+      },
+      {
+        "commit": "999dfb6",
+        "file": "packages/core/src/internal/effect/store.ts",
+        "diff": "@@ -84,13 +107,91 @@ export function appendComment(connector: StoreConnector, comment: NewComment): P\n   return run(call(connector, \"append\", () => connector.append(comment)));\n }\n \n+/**\n+ * Appends several. One write where the connector takes a batch, one call each\n+ * where it does not, so a caller never has to ask which kind it has.\n+ */\n+export async function appendComments(\n+  connector: StoreConnector,\n+  comments: readonly NewComment[],\n+): Promise<readonly Comment[]> {\n+  const many = connector.appendMany?.bind(connector);\n+  if (many) return await run(call(connector, \"appendMany\", () => many(comments)));\n+\n+  const stored: Comment[] = [];\n+  for (const comment of comments) stored.push(await appendComment(connector, comment));\n+  return stored;\n+}\n+\n /** Sets a comment's status. Resolves to null when the connector cannot do it. */\n export function setCommentStatus(\n   connector: StoreConnector,\n   id: string,\n   status: CommentStatus,\n+  resolution?: CommentResolution,\n ): Promise<Comment | null> {\n   const setStatus = connector.setStatus?.bind(connector);\n   if (!setStatus) return Promise.resolve(null);\n-  return run(call(connector, \"setStatus\", () => setStatus(id, status)));\n+  return run(call(connector, \"setStatus\", () => setStatus(id, status, resolution)));\n+}\n+\n+/**\n+ * The commit a surface points at now. Undefined for a connector that cannot\n+ * say and for a branch with no head; the capability report tells them apart.\n+ * Never memoised: a push moves the head and a cached one gates the wrong commit.\n+ */\n+export function headCommit(connector: StoreConnector, branch: string): Promise<string | undefined> {\n+  const head = connector.head?.bind(connector);\n+  if (!head) return Promise.resolve(undefined);\n+  return run(call(connector, \"head\", () => head(branch)));\n+}\n+\n+/**\n+ * Long-polls for new comments, or undefined where the connector cannot.\n+ *\n+ * Neither timed out nor retried: the poll is documented to resolve empty when\n+ * its own window closes, so CALL_TIMEOUT would turn a quiet period into a\n+ * failure, and a retry would re-enter it on a signal the caller already spent.\n+ */\n+export function watchComments(\n+  connector: StoreConnector,\n+  query: ListQuery,\n+  signal: AbortSignal,\n+): Promise<CommentPage | undefined> {\n+  const watch = connector.watch?.bind(connector);\n+  if (!watch) return Promise.resolve(undefined);\n+  return run(attempt(connector, \"watch\", () => watch(query, signal)));\n+}\n+\n+/**\n+ * Approvals on a surface. Undefined is a connector that keeps none, which the\n+ * gate reports as neutral; an empty array is a connector that keeps them and\n+ * holds none, which is \"nobody approved\". The two must never be conflated.\n+ */\n+export function listApprovals(\n+  connector: StoreConnector,\n+  branch: string,\n+): Promise<readonly Approval[] | undefined> {\n+  const approvals = connector.approvals?.bind(connector);\n+  if (!approvals) return Promise.resolve(undefined);\n+  return run(call(connector, \"approvals\", () => approvals(branch)));\n+}\n+\n+/** Records an approval. Resolves to null when the connector keeps none. */\n+export function approveSurface(\n+  connector: StoreConnector,\n+  approval: NewApproval,\n+): Promise<Approval | null> {\n+  const approve = connector.approve?.bind(connector);\n+  if (!approve) return Promise.resolve(null);\n+  return run(call(connector, \"approve\", () => approve(approval)));\n+}\n+\n+/** Takes one back. Resolves false when the connector cannot withdraw one. */\n+export async function unapproveSurface(connector: StoreConnector, id: string): Promise<boolean> {\n+  const unapprove = connector.unapprove?.bind(connector);\n+  if (!unapprove) return false;\n+\n+  await run(call(connector, \"unapprove\", () => unapprove(id)));\n+  return true;\n }"
+      }
+    ]
+  },
+  {
+    "id": "drift-071",
+    "by": "maintainer",
+    "label": "current",
+    "doc": "docs/drafts.md",
+    "at": "999dfb6",
+    "paragraph": "`StoreConnector.appendMany` is the optional method behind **Publish all**. A\nstore that implements it takes the whole set in one write; one that does not\ngets them one at a time from `CommentStore.appendMany`, which is the same\nresult and more calls. `githubStore` implements it as a single ledger repost, so four comments\nare one comment on the pull request and one notification.",
+    "change": [
+      {
+        "commit": "999dfb6",
+        "file": "packages/core/src/route/handler.ts",
+        "diff": "@@ -342,7 +345,7 @@ async function appendComment(\n     author,\n   }));\n \n-  const stored = await appendAll(store, comments);\n+  const stored = await store.appendMany(comments);\n   const branch = stored[0]?.branch;\n   if (branch !== undefined) await reportGate(options, store, request, branch);\n \n@@ -352,19 +355,6 @@ async function appendComment(\n /** The author Maple records when no identity connector named one. */\n const GUEST = { id: \"guest\", name: \"Guest\", provenance: \"guest\" } as const;\n \n-/** `appendMany` where the store has it, one at a time where it does not. */\n-async function appendAll(\n-  store: StoreConnector,\n-  comments: readonly NewComment[],\n-): Promise<readonly Comment[]> {\n-  const many = store.appendMany?.bind(store);\n-  if (many) return await many(comments);\n-\n-  const stored: Comment[] = [];\n-  for (const comment of comments) stored.push(await store.append(comment));\n-  return stored;\n-}\n-\n /** A resolved reviewer, as a comment or an approval records them. */\n function authorFor(user: MapleUser): CommentAuthor {\n   return {"
+      },
+      {
+        "commit": "999dfb6",
+        "file": "packages/core/src/internal/effect/store.ts",
+        "diff": "@@ -84,13 +107,91 @@ export function appendComment(connector: StoreConnector, comment: NewComment): P\n   return run(call(connector, \"append\", () => connector.append(comment)));\n }\n \n+/**\n+ * Appends several. One write where the connector takes a batch, one call each\n+ * where it does not, so a caller never has to ask which kind it has.\n+ */\n+export async function appendComments(\n+  connector: StoreConnector,\n+  comments: readonly NewComment[],\n+): Promise<readonly Comment[]> {\n+  const many = connector.appendMany?.bind(connector);\n+  if (many) return await run(call(connector, \"appendMany\", () => many(comments)));\n+\n+  const stored: Comment[] = [];\n+  for (const comment of comments) stored.push(await appendComment(connector, comment));\n+  return stored;\n+}\n+\n /** Sets a comment's status. Resolves to null when the connector cannot do it. */\n export function setCommentStatus(\n   connector: StoreConnector,\n   id: string,\n   status: CommentStatus,\n+  resolution?: CommentResolution,\n ): Promise<Comment | null> {\n   const setStatus = connector.setStatus?.bind(connector);\n   if (!setStatus) return Promise.resolve(null);\n-  return run(call(connector, \"setStatus\", () => setStatus(id, status)));\n+  return run(call(connector, \"setStatus\", () => setStatus(id, status, resolution)));\n+}\n+\n+/**\n+ * The commit a surface points at now. Undefined for a connector that cannot\n+ * say and for a branch with no head; the capability report tells them apart.\n+ * Never memoised: a push moves the head and a cached one gates the wrong commit.\n+ */\n+export function headCommit(connector: StoreConnector, branch: string): Promise<string | undefined> {\n+  const head = connector.head?.bind(connector);\n+  if (!head) return Promise.resolve(undefined);\n+  return run(call(connector, \"head\", () => head(branch)));\n+}\n+\n+/**\n+ * Long-polls for new comments, or undefined where the connector cannot.\n+ *\n+ * Neither timed out nor retried: the poll is documented to resolve empty when\n+ * its own window closes, so CALL_TIMEOUT would turn a quiet period into a\n+ * failure, and a retry would re-enter it on a signal the caller already spent.\n+ */\n+export function watchComments(\n+  connector: StoreConnector,\n+  query: ListQuery,\n+  signal: AbortSignal,\n+): Promise<CommentPage | undefined> {\n+  const watch = connector.watch?.bind(connector);\n+  if (!watch) return Promise.resolve(undefined);\n+  return run(attempt(connector, \"watch\", () => watch(query, signal)));\n+}\n+\n+/**\n+ * Approvals on a surface. Undefined is a connector that keeps none, which the\n+ * gate reports as neutral; an empty array is a connector that keeps them and\n+ * holds none, which is \"nobody approved\". The two must never be conflated.\n+ */\n+export function listApprovals(\n+  connector: StoreConnector,\n+  branch: string,\n+): Promise<readonly Approval[] | undefined> {\n+  const approvals = connector.approvals?.bind(connector);\n+  if (!approvals) return Promise.resolve(undefined);\n+  return run(call(connector, \"approvals\", () => approvals(branch)));\n+}\n+\n+/** Records an approval. Resolves to null when the connector keeps none. */\n+export function approveSurface(\n+  connector: StoreConnector,\n+  approval: NewApproval,\n+): Promise<Approval | null> {\n+  const approve = connector.approve?.bind(connector);\n+  if (!approve) return Promise.resolve(null);\n+  return run(call(connector, \"approve\", () => approve(approval)));\n+}\n+\n+/** Takes one back. Resolves false when the connector cannot withdraw one. */\n+export async function unapproveSurface(connector: StoreConnector, id: string): Promise<boolean> {\n+  const unapprove = connector.unapprove?.bind(connector);\n+  if (!unapprove) return false;\n+\n+  await run(call(connector, \"unapprove\", () => unapprove(id)));\n+  return true;\n }"
+      }
+    ]
   }
 ]
