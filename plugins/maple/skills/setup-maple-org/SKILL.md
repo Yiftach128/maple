@@ -35,7 +35,7 @@ reviewable. Substitute your own.
 The CLI does the parts of this that can be generated: `npx @maple-kit/cli@0.13.0
 setup app --owner=acme` prints the prefilled registration URL (`--gate` for the
 gate App), `setup verify --client-id=<Iv…>` checks Device Flow, and `setup ci`
-prints the gate workflow. Flags take the `--flag=value` form only.
+prints the gate workflow. Flags take `--flag=value` or `--flag value`.
 
 ## 1. Register the GitHub App
 
