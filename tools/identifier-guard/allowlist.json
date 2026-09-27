@@ -1,0 +1,7 @@
+{
+  "runner": "The home directory on a GitHub-hosted Linux runner.",
+  "Shared": "macOS's shared directory under /Users, not a person.",
+  "user": "A placeholder user in examples and test fixtures.",
+  "username": "A placeholder user in examples.",
+  "you": "A placeholder user in examples."
+}

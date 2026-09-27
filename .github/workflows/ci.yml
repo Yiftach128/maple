@@ -130,6 +130,25 @@ jobs:
         # Node builtins only, so no install.
         run: node tools/doc-guards/check.ts
 
+  identifier-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # The check diffs against the merge base, which a shallow clone lacks.
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+      - name: No denylisted identifier or home path added
+        # The denylist reaches the script only through env and is never printed:
+        # masking covers the whole secret, not each term. Forks and Dependabot
+        # get no secret, and the home-path rule runs alone.
+        env:
+          MAPLE_IDENTIFIER_DENYLIST: ${{ secrets.MAPLE_IDENTIFIER_DENYLIST }}
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: node tools/identifier-guard/check.ts --base "$BASE"
+
   gitleaks:
     runs-on: ubuntu-latest
     steps:

@@ -23,6 +23,7 @@
     "check:changeset-level": "node tools/changeset-level/check.ts",
     "check:doc-guards": "node tools/doc-guards/check.ts",
     "check:doc-references": "node tools/doc-references/check.ts",
+    "check:identifiers": "node tools/identifier-guard/check.ts",
     "check:skill-links": "node tools/skill-links/check.ts",
     "check": "pnpm lint && pnpm typecheck && pnpm test",
     "demo:record": "node tools/demo-recorder/record.ts && tools/demo-recorder/encode.sh",
