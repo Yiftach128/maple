@@ -40,6 +40,11 @@ jobs:
         # Tables that restate code are rendered from it; a diff means the code
         # moved and `pnpm docs:generate` was not run.
         run: pnpm docs:generate --check
+      - name: What the docs name exists
+        # Env vars, @maple-kit imports, file paths and relative links in every
+        # tracked Markdown file, resolved against the code. Allowlist:
+        # tools/doc-references/allowlist.json.
+        run: pnpm check:doc-references
       - name: No new suppressions
         # `--prune-suppressions` rewrites the file when an entry is no longer
         # needed. A diff here means the ratchet moved and was not committed.

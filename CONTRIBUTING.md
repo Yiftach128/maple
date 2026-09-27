@@ -172,6 +172,15 @@ then run `pnpm docs:generate`. Edits inside the markers are overwritten, and a
 hook and CI fail when a section no longer matches.
 `tools/docs-generate/sections.ts` lists each section and its source.
 
+## What the docs name
+
+`pnpm check:doc-references` reads the inline code and relative links in every
+tracked Markdown file and fails on an env var, an `@maple-kit/*` import, a file
+path or a link that nothing in the repository has. An unknown camelCase or
+PascalCase identifier is a warning. A name the docs mention on purpose — another
+product's variable, a file in a host application — goes in
+`tools/doc-references/allowlist.json` with the reason.
+
 ## Changesets
 
 If you changed a published package:

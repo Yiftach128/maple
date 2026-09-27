@@ -40,6 +40,11 @@ pre-commit:
       # not staged. It imports a handful of source files, in under a second.
       run: node tools/docs-generate/generate.ts --check
 
+    - name: doc-references
+      # No glob: renaming an env var or a file breaks a doc that is not staged.
+      # It reads what git tracks, in well under a second.
+      run: node tools/doc-references/check.ts
+
     - name: commit-identity
       # Git falls back to the global identity when a repository sets none, which
       # is how a work address ends up in a history meant to be published. This
