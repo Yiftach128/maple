@@ -1,5 +1,22 @@
 # @maple-kit/core
 
+## 0.13.0
+
+### Minor Changes
+
+- a5e0af6: `maple-mcp` now reports a failed gate publish on resolve. It had no logger, so
+  an expired `MAPLE_GATE_TOKEN` or a missing `checks: write` left the check on its
+  old verdict with nothing said. It logs to stderr, since stdout is the MCP
+  transport.
+
+  Core adds `streamSink(stream)` to `@maple-kit/core/logger`: one text line per
+  record to any `{ write(text) }`, such as `process.stderr`. `consoleSink` could
+  not serve here because `console.info` writes to stdout.
+
+### Patch Changes
+
+- 34cd66d: The GitHub store now resolves a head branch to its open pull request, even when a newer pull request on the same head is closed, such as a duplicate that was opened and closed. A closed or merged pull request is used only when none on the head is open, and then the most recently updated one.
+
 ## 0.12.1
 
 No changes in this release.

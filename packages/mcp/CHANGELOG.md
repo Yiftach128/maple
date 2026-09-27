@@ -1,5 +1,30 @@
 # @maple-kit/mcp
 
+## 0.13.0
+
+### Minor Changes
+
+- fdb20e3: `maple-stop-hook` now gives up after eight blocked stops in a row under Claude Code. It used to count a `blocks` field Claude Code never sends, so it blocked for as long as a comment stayed open. The count is now kept per `session_id` in the system temp directory and starts again on any stop that `stop_hook_active` says no block caused.
+
+  The hook also defaults `MAPLE_BRANCH` to the branch checked out in the session's working directory, and lets every stop through when neither `MAPLE_GITHUB_OWNER` nor `MAPLE_GITHUB_REPO` is set, so it can ship in the Claude Code plugin without failing in projects Maple does not review.
+
+  Breaking: `decideStop(open, blocks)` takes the number of blocks so far instead of a `StopHookInput`, and `StopHookInput` now describes Claude Code's real Stop payload (`session_id`, `transcript_path`, `cwd`, `hook_event_name`, `stop_hook_active`, …) without `blocks`. `decideSessionStop`, `fileBlockCounter`, `parseStopHookPayload` and `currentBranch` are new exports.
+
+### Patch Changes
+
+- a5e0af6: `maple-mcp` now reports a failed gate publish on resolve. It had no logger, so
+  an expired `MAPLE_GATE_TOKEN` or a missing `checks: write` left the check on its
+  old verdict with nothing said. It logs to stderr, since stdout is the MCP
+  transport.
+
+  Core adds `streamSink(stream)` to `@maple-kit/core/logger`: one text line per
+  record to any `{ write(text) }`, such as `process.stderr`. `consoleSink` could
+  not serve here because `console.info` writes to stdout.
+
+- Updated dependencies [34cd66d]
+- Updated dependencies [a5e0af6]
+  - @maple-kit/core@0.13.0
+
 ## 0.12.1
 
 ### Patch Changes

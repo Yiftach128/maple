@@ -1,6 +1,6 @@
 {
   "name": "maple",
-  "version": "0.12.3",
+  "version": "0.12.4",
   "description": "Skills to set up Maple and act on its review comments, the MCP server that reads and resolves them, and a Stop hook that keeps an agent working while they are open.",
   "author": {
     "name": "maple-kit",

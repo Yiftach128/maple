@@ -2,7 +2,7 @@
   "mcpServers": {
     "maple": {
       "command": "npx",
-      "args": ["-y", "-p", "@maple-kit/mcp@0.12.1", "maple-mcp"],
+      "args": ["-y", "-p", "@maple-kit/mcp@0.13.0", "maple-mcp"],
       "env": {
         "GITHUB_TOKEN": "${GITHUB_TOKEN:-}",
         "MAPLE_GITHUB_OWNER": "${MAPLE_GITHUB_OWNER:-}",
