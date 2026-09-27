@@ -7,10 +7,10 @@ enforces. A prompt without an eval is a prompt nobody can change safely.
 the model tier whenever a credential is in the environment.
 
 - `assist`: thirty review comments written against a real running application.
-- `mock-plan`: 94 sentences for the mock box against seven pages' calls, two
+- `mock-plan`: 139 sentences for the mock box against seven pages' calls, two
   recorded from the examples and five written at production scale, three of
-  them with flags and roles; 29 of the sentences are a set of their own for
-  those, scored and gated apart. Every sentence so far is `by: agent`;
+  them with flags and roles; 38 of the sentences are a set of their own for
+  those, and 36 for `long`, `sparse` and `mixed`, each scored and gated apart. Every sentence so far is `by: agent`;
   `cases/mock-plan/README.md` says why that matters and what the set needs
   next.
 - `doc-drift`: 71 paragraphs from Maple's own docs, 34 a code change had made

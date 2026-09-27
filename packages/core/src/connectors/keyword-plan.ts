@@ -5,7 +5,7 @@
  */
 
 import { MOCK_STATES } from "../mock/recipe.js";
-import { planFlags, planRole } from "./keyword-layers.js";
+import { planFlags, planRole, withoutLayers } from "./keyword-layers.js";
 import { plannedCall, stateFromWeights } from "./plan.js";
 
 import type { MockState } from "../mock/recipe.js";
@@ -206,10 +206,15 @@ export function keywordPlan(request: MockPlanRequest): MockPlan {
   const role = request.roles === undefined ? undefined : planRole(text, request.roles);
   return {
     ...stateFromWeights(weights),
-    calls: concerns(contentWords(text), request.calls),
+    calls: concerns(contentWords(dataPart(text, request)), request.calls),
     ...(request.flags === undefined ? {} : { flags: planFlags(text, request.flags) }),
     ...(role === undefined ? {} : { role }),
   };
+}
+
+/** What the sentence asks of the data: the role it names and the flags it switches pick no call. */
+function dataPart(text: string, request: MockPlanRequest): string {
+  return withoutLayers(text, request.flags ?? [], request.roles ?? []);
 }
 
 /**

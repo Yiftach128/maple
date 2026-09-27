@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { withoutLayers } from "../src/connectors/keyword-layers.js";
 import { keywordPlan } from "../src/connectors/keyword-plan.js";
 import { plannedCall, stateFromWeights } from "../src/connectors/plan.js";
 import { PLAN_FLOOR } from "../src/mock/reading.js";
@@ -218,5 +219,62 @@ describe("the keyword planner's flags and role", () => {
     const planned = layered("no roasts as a barista with the new roaster");
     expect(planned.state).toBe("empty");
     expect(planned.calls.find((call) => call.key === "trpc:roast.list")?.concerned).toBe(true);
+  });
+});
+
+describe("withoutLayers", () => {
+  const FLAGS = [
+    { key: "merge-forecast", type: "boolean" as const },
+    { key: "roastTier", type: "string" as const, variants: ["gold", "free"] },
+    { key: "comments", type: "boolean" as const },
+  ];
+  const ROLES = ["owner", "member", "head-roaster"];
+
+  it.each<[string, string]>([
+    [
+      "as a member with the merge forecast on, and the reviews table empty",
+      "the reviews table empty",
+    ],
+    ["as a member, with the merge forecast on", ""],
+    ["the merge forecast turned off for an owner", ""],
+    ["as the head roaster with no roasts yet", "no roasts yet"],
+    ["gold roast tier and a single roast", "a single roast"],
+    ["no comments", "no comments"],
+    ["comments off and no roasts", "no roasts"],
+    ["the owner column is empty", "the owner column is empty"],
+    ["No Roasts As A Member", "No Roasts"],
+  ])("reads %j as asking %j of the data", (request, left) => {
+    expect(withoutLayers(request, FLAGS, ROLES)).toBe(left);
+  });
+
+  it("leaves a sentence alone on a page that lists no flags or roles", () => {
+    expect(withoutLayers("as a member, no reviews", [], [])).toBe("as a member, no reviews");
+  });
+});
+
+describe("a sentence naming a role, a flag and a state", () => {
+  const PAGE: readonly MockPlanCall[] = [
+    { key: "rest:GET /api/session", summary: "name, tint, role, permissions" },
+    { key: "rest:GET /api/audit", summary: "items [AuditEvent: id, who, what, when]" },
+    { key: "rest:GET /api/reviews", summary: "items [Review: id, repo, branch, state], total" },
+  ];
+
+  it.each<[string, string[]]>([
+    [
+      "as a member with the merge forecast on, and the reviews table empty",
+      ["rest:GET /api/reviews"],
+    ],
+    ["as a member with the merge forecast on, and no open reviews", ["rest:GET /api/reviews"]],
+    ["the member's view with no reviews", ["rest:GET /api/reviews"]],
+  ])("%j puts its state on %j alone", (request, calls) => {
+    const planned = keywordPlan({
+      request,
+      route: "/",
+      calls: PAGE,
+      flags: [{ key: "merge-forecast", type: "boolean" }],
+      roles: ["owner", "member", "guest"],
+    });
+    expect(planned.state).toBe("empty");
+    expect(planned.calls.filter((call) => call.concerned).map((call) => call.key)).toEqual(calls);
   });
 });

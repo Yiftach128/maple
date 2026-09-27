@@ -226,6 +226,20 @@ describe("jevClassifier", () => {
       expect(plan?.flags).toEqual([]);
     });
 
+    it("judges the calls on the sentence less the role and flags it names", async () => {
+      await connector().plan?.({ ...layered, request: "no roasts as a barista, new roaster on" });
+
+      const data = fake.asked.find((asked) => "state" in asked.questions);
+      expect(data?.state).toEqual({
+        request: "no roasts as a barista, new roaster on",
+        data: "no roasts",
+        route: "/roasts",
+        calls: CALLS,
+      });
+      expect(data?.questions["call:0"]?.instructions).toContain("`data`");
+      expect(data?.questions["state"]?.instructions).not.toContain("`data`");
+    });
+
     it("asks once, as without them, when the request lists none", async () => {
       await connector().plan?.({ ...layered, flags: [], roles: [] });
       expect(fake.asked).toHaveLength(1);

@@ -71,13 +71,13 @@ const CASES = read<readonly Case[]>("cases.json");
 const THRESHOLDS = {
   keyword: {
     data: { state: 0.9, calls: 0.68, layers: 0.95 },
-    layers: { state: 0.97, calls: 0.64, layers: 0.8 },
+    layers: { state: 0.97, calls: 0.72, layers: 0.83 },
     values: { state: 0.94, calls: 0.61, layers: 0.99 },
   },
   model: {
-    data: { state: 0.92, calls: 0.74, layers: 0.97 },
-    layers: { state: 0.8, calls: 0.68, layers: 0.9 },
-    values: { state: 0.87, calls: 0.8, layers: 0.9 },
+    data: { state: 0.92, calls: 0.86, layers: 0.97 },
+    layers: { state: 0.88, calls: 0.93, layers: 0.9 },
+    values: { state: 0.87, calls: 0.9, layers: 0.9 },
   },
 } satisfies Record<string, Record<CaseSet, Report>>;
 

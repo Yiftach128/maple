@@ -20,6 +20,7 @@ import {
   pillarQuestion,
   pillarScoreFrom,
   PLAN_STATE_KEY,
+  planDataFor,
   plannedCallFrom,
   planStateFor,
   planStateFrom,
@@ -85,8 +86,9 @@ export function jevClassifier(options: JevClassifierOptions): ClassifierConnecto
 
     async plan(request: MockPlanRequest): Promise<MockPlan> {
       const questions: Record<string, Question> = { [PLAN_STATE_KEY]: planStateQuestion() };
+      const data = planDataFor(request) !== undefined;
       request.calls.forEach((call, index) => {
-        questions[callKey(index)] = callQuestion(index, call.key);
+        questions[callKey(index)] = callQuestion(index, call.key, data);
       });
 
       const asked = { connector: connector.name, signal: request.signal };

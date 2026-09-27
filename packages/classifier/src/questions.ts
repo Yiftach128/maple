@@ -14,6 +14,7 @@ import {
   MOCK_PLAN_STATE_DESCRIPTIONS,
   MOCK_PLAN_STATES,
   plannedCall,
+  withoutLayers,
 } from "@maple-kit/core/connectors";
 
 import type {
@@ -93,10 +94,26 @@ export function callKey(index: number): string {
   return `call:${index}`;
 }
 
-/** A mock request's `state`: the sentence, its route and the calls, as they came. */
+/**
+ * What the sentence asks of the data, when it also names a listed role or
+ * flag: the sentence less those, which the calls are judged on. Left in, a
+ * role or a flag reads as the whole page, and every call came out concerned.
+ */
+export function planDataFor(request: MockPlanRequest): string | undefined {
+  const data = withoutLayers(request.request, request.flags ?? [], request.roles ?? []);
+  return data === request.request.trim() ? undefined : data;
+}
+
+/**
+ * A mock request's `state`: the sentence, its route and the calls, as they
+ * came, and its {@link planDataFor} where that differs. The state is judged
+ * on the whole sentence: "no roasts yet" alone reads as not yet a state.
+ */
 export function planStateFor(request: MockPlanRequest): { readonly [key: string]: Json } {
+  const data = planDataFor(request);
   return {
     request: request.request,
+    ...(data === undefined ? {} : { data }),
     route: request.route,
     calls: request.calls.map(({ key, summary }) => ({ key, summary })),
   };
@@ -116,16 +133,24 @@ export function planStateQuestion(): ChoiceQuestion {
   };
 }
 
-/** Whether the request concerns one call, as a `noul`. */
-export function callQuestion(index: number, key: string): NoulQuestion {
+/**
+ * Whether the request concerns one call, as a `noul`: judged on `data` where
+ * the state carries it, which is the request less its role and flags.
+ */
+export function callQuestion(index: number, key: string, data = false): NoulQuestion {
+  const asked = data
+    ? "the reviewer's `data`, the part of their `request` about the page's data,"
+    : "the reviewer's `request`";
   return {
     type: "noul",
     instructions:
-      `Does the reviewer's \`request\` concern \`calls[${index}]\` (${key})? A request` +
-      " about the whole page concerns every call that reads data, and none that writes it.",
+      `Does ${asked} concern \`calls[${index}]\` (${key})? A request` +
+      " about the whole page concerns every call that reads data, and none that writes it." +
+      " Who to see the page as, and a feature to turn on or off, concern no call.",
     criteria: {
-      true: "The request is about what this call returns, or about the whole page's data.",
-      false: "The request is about other calls, or names nothing this call returns.",
+      true: "The request asks for what this call returns to be some way, or for the whole page's data to be.",
+      false:
+        "The request is about other calls, names nothing this call returns, or only says who to see the page as or which feature to turn on or off.",
     },
   };
 }

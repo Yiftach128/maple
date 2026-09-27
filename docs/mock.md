@@ -450,11 +450,24 @@ a camel-cased key split into words. A sentence sharing no word with any call
 is about the whole page, and concerns every call except a REST write and one
 whose summary says `mutation`.
 
-**The eval** is `evals/mock-plan.eval.test.ts`: 130 sentences against seven
+**A role or a flag picks no call.** Both planners judge the calls on the
+sentence less the listed roles and flags it names, `withoutLayers`: a role as
+the keyword planner reads one, a flag by its key's words with the words that
+switch it or a listed value beside them, and a one-word key only with one of
+those, since alone it may be the page's data. "As a member with the merge
+forecast on, and the reviews table empty" is judged as "the reviews table
+empty", and concerns the reviews call alone; left whole, jev read the role and
+the flag as the whole page and put the session and the audit log in the state
+too. jev still judges the state on the whole sentence, and gets the rest as
+`data` beside it: "no roasts yet" alone reads as not yet a state. A flag named
+in other words is left in, and the call question says who the page is shown as
+and what is switched concern no call.
+
+**The eval** is `evals/mock-plan.eval.test.ts`: 139 sentences against seven
 pages' calls, scored on state accuracy, on the F1 of the calls a plan
 concerns, and, on the three pages with flags and roles, on whether the flags
 and role it sets are exactly the ones meant. It is scored per set: the 65
-data cases, where jev must beat the word list on state and calls; 29
+data cases, where jev must beat the word list on state and calls; 38
 cases written for flags and roles, where it must beat it on the layers; and
 36 written for `long`, `sparse` and `mixed`, where it must beat it on calls,
 since the word list's patterns for those three were tuned on them.

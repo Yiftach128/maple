@@ -1206,5 +1206,131 @@
     "state": "empty",
     "calls": ["trpc:cupping.listForBean"],
     "maybe": ["trpc:cupping.meanScore"]
+  },
+  {
+    "id": "mockplan-131",
+    "by": "agent",
+    "set": "layers",
+    "inventory": "roastery-dashboard",
+    "request": "as a barista with the new roast planner on, and the orders list empty",
+    "state": "empty",
+    "calls": ["trpc:order.list"],
+    "flags": {
+      "new-roast-planner": true
+    },
+    "as": "barista"
+  },
+  {
+    "id": "mockplan-132",
+    "by": "agent",
+    "set": "layers",
+    "inventory": "roastery-dashboard",
+    "request": "as the owner with the low stock banner off, and no roasts yet",
+    "state": "empty",
+    "calls": ["trpc:roast.list"],
+    "maybe": [
+      "trpc:roast.countByStatus",
+      "trpc:roast.meanRoastTime",
+      "trpc:roast.overTime",
+      "trpc:roast.overTimeSparkline",
+      "trpc:origin.top"
+    ],
+    "flags": {
+      "low-stock-banner": false
+    },
+    "as": "owner"
+  },
+  {
+    "id": "mockplan-133",
+    "by": "agent",
+    "set": "layers",
+    "inventory": "roastery-dashboard",
+    "request": "for a wholesale buyer, with the wholesale portal on and the orders failing to load",
+    "state": "error",
+    "calls": ["trpc:order.list"],
+    "flags": {
+      "wholesale-portal": true
+    },
+    "as": "wholesale-buyer"
+  },
+  {
+    "id": "mockplan-134",
+    "by": "agent",
+    "set": "layers",
+    "inventory": "roastery-dashboard",
+    "request": "as a roaster in the dark theme, and the low stock beans list empty",
+    "state": "empty",
+    "calls": ["trpc:bean.listLowStock"],
+    "flags": {
+      "theme": "dark"
+    },
+    "as": "roaster"
+  },
+  {
+    "id": "mockplan-135",
+    "by": "agent",
+    "set": "layers",
+    "inventory": "order-queue",
+    "request": "as a barista with bulk ship enabled, and no shipments",
+    "state": "empty",
+    "calls": ["rest:GET /api/shipments"],
+    "flags": {
+      "bulk-ship": true
+    },
+    "as": "barista"
+  },
+  {
+    "id": "mockplan-136",
+    "by": "agent",
+    "set": "layers",
+    "inventory": "order-queue",
+    "request": "as the owner with split shipments on, and the shipments list failing",
+    "state": "error",
+    "calls": ["rest:GET /api/shipments"],
+    "flags": {
+      "split-shipments": true
+    },
+    "as": "owner"
+  },
+  {
+    "id": "mockplan-137",
+    "by": "agent",
+    "set": "layers",
+    "inventory": "roast-detail",
+    "request": "as a viewer with the roast curve overlay on, and the comments empty",
+    "state": "empty",
+    "calls": ["trpc:comment.listForRoast"],
+    "maybe": ["trpc:comment.countForRoast"],
+    "flags": {
+      "roast-curve-overlay": true
+    },
+    "as": "viewer"
+  },
+  {
+    "id": "mockplan-138",
+    "by": "agent",
+    "set": "layers",
+    "inventory": "roast-detail",
+    "request": "as a head roaster with the maintenance alerts hidden, and no batches",
+    "state": "empty",
+    "calls": ["trpc:roast.batchesForRoast"],
+    "flags": {
+      "roaster-maintenance-alerts": false
+    },
+    "as": "head-roaster"
+  },
+  {
+    "id": "mockplan-139",
+    "by": "agent",
+    "set": "layers",
+    "inventory": "roast-detail",
+    "request": "as an owner with the ai notes hidden, and hundreds of cuppings",
+    "state": "many",
+    "calls": ["trpc:cupping.listForRoast"],
+    "maybe": ["trpc:cupping.meanScore"],
+    "flags": {
+      "ROAST-3001-ai-notes": false
+    },
+    "as": "owner"
   }
 ]
