@@ -1,0 +1,65 @@
+name: Doc drift
+
+# Advisory. jev reads each paragraph that names code this pull request changes,
+# in docs it does not touch, and one sticky comment lists what looks stale. It
+# never fails on what it finds; evals/cases/doc-drift decides when it may.
+on:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  judge:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write # the one comment it keeps
+    env:
+      # Absent on a fork's pull request: GitHub hands forks no secrets.
+      TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # The head commit itself, so links in the comment outlive the merge ref.
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+      - name: Judge the paragraphs the change reaches
+        # Node builtins only, so no install. Without the key it logs why and exits 0.
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          OUT: ${{ runner.temp }}/doc-drift.md
+        run: >-
+          node tools/doc-drift/run.ts --base "$BASE" --head "$HEAD" --out "$OUT"
+          --repository "$GITHUB_REPOSITORY"
+      - name: Post or update the one comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          OUT: ${{ runner.temp }}/doc-drift.md
+        run: |
+          if [ ! -f "$OUT" ]; then
+            echo "Nothing was judged, so there is no comment to post."
+            exit 0
+          fi
+          id=$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$PR/comments" \
+                 --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | startswith("<!-- maple-doc-drift -->"))) | .id' \
+               | head -n 1)
+          flagged=$(cat "$OUT.count")
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -F body=@"$OUT" > /dev/null
+            echo "Updated comment $id: $flagged flagged."
+          elif [ "$flagged" -gt 0 ]; then
+            gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body-file "$OUT"
+            echo "Posted: $flagged flagged."
+          else
+            echo "Nothing flagged and no earlier comment, so nothing to post."
+          fi

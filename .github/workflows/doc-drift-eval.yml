@@ -1,0 +1,43 @@
+name: Doc drift eval
+
+# Scores jev on evals/cases/doc-drift. Only when the judge, its cases or this
+# file change: 78 model calls, and a threshold near the measured rate, would
+# otherwise redden unrelated pull requests at random.
+on:
+  pull_request:
+    paths:
+      - tools/doc-drift/**
+      - tools/doc-references/**
+      - evals/cases/doc-drift/**
+      - evals/doc-drift.eval.test.ts
+      - .github/workflows/doc-drift-eval.yml
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  eval:
+    # The model tier of evals/doc-drift.eval.test.ts, which `pnpm test` skips
+    # without the key. Its threshold is what may one day make the judge a check.
+    runs-on: ubuntu-latest
+    env:
+      TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
+      EVAL_VERBOSE: "1"
+      # jev is not deterministic: one case moved between two runs. Three samples
+      # score the rate rather than one draw of it.
+      EVAL_SAMPLES: "3"
+    steps:
+      - name: Skip without the key
+        if: env.TYPESAFE_API_KEY == ''
+        run: echo "TYPESAFE_API_KEY is not set (a fork's pull request gets no secrets), so jev is not scored."
+      - uses: actions/checkout@v5
+        if: env.TYPESAFE_API_KEY != ''
+      - uses: ./.github/actions/setup
+        if: env.TYPESAFE_API_KEY != ''
+      - name: Score jev on the doc-drift cases
+        if: env.TYPESAFE_API_KEY != ''
+        run: pnpm vitest run --project node evals/doc-drift.eval.test.ts

@@ -6,9 +6,13 @@ import {
   checkReferences,
   checkRepository,
   classify,
+  extractParagraphs,
   extractReferences,
   importsOf,
   isChecked,
+  nameOf,
+  pointsAt,
+  wordsIn,
 } from "./check.js";
 
 import type { Kind, ReferenceIndex } from "./check.js";
@@ -74,6 +78,71 @@ describe("extractReferences", () => {
     ["a code span in a triple-backtick run", "```ts```"],
   ])("skips %s", (_case, text) => {
     expect(extractReferences("x.md", text, ROOTS)).toEqual([]);
+  });
+});
+
+describe("extractParagraphs", () => {
+  it("splits on blank lines, headings and fences, and keeps each block's references", () => {
+    const text = [
+      "# Title",
+      "One `MAPLE_PREVIEW`",
+      "two.",
+      "",
+      "```sh",
+      "`MAPLE_X`",
+      "",
+      "```",
+      "## Next",
+      "See [gate](docs/gate.md).",
+    ].join("\n");
+    expect(extractParagraphs("x.md", text, ROOTS)).toEqual([
+      {
+        end: 3,
+        file: "x.md",
+        references: [{ file: "x.md", kind: "env", line: 2, text: "MAPLE_PREVIEW" }],
+        start: 2,
+        text: "One `MAPLE_PREVIEW`\ntwo.",
+      },
+      {
+        end: 10,
+        file: "x.md",
+        references: [{ file: "x.md", kind: "link", line: 10, text: "docs/gate.md" }],
+        start: 10,
+        text: "See [gate](docs/gate.md).",
+      },
+    ]);
+  });
+});
+
+describe("pointsAt", () => {
+  const at = (kind: Kind, text: string, file = "docs/x.md") => ({ file, kind, line: 1, text });
+
+  it.each<[Kind, string, string, boolean]>([
+    ["path", "packages/core/src/route/gate.ts", "packages/core/src/route/gate.ts", true],
+    ["path", "packages/core/src/route/gate.ts:12", "packages/core/src/route/gate.ts", true],
+    ["path", "packages/mcp/", "packages/mcp/src/config.ts", false],
+    ["path", "src/config.ts", "packages/mcp/src/config.ts", true],
+    ["path", "packages/mcp", "packages/mcpx/src/config.ts", false],
+    ["link", "../packages/core/README.md", "packages/core/README.md", true],
+    ["link", "gate.md#top", "docs/gate.md", true],
+    ["link", "../packages/core/", "packages/core/src/index.ts", false],
+    ["import", "@maple-kit/core/route", "packages/core/src/route/handler.ts", true],
+    ["import", "@maple-kit/core/route", "packages/core/src/auth/cookie.ts", false],
+    ["import", "@maple-kit/ui/maple", "packages/ui/src/maple.tsx", true],
+    ["import", "@maple-kit/core@0.12.0", "packages/core/src/index.ts", true],
+    ["import", "@maple-kit/core", "packages/core/src/route/handler.ts", false],
+    ["env", "MAPLE_BRANCH", "packages/mcp/src/config.ts", false],
+  ])("%s %s → %s: %s", (kind, text, file, expected) => {
+    expect(pointsAt(at(kind, text), file)).toBe(expected);
+  });
+
+  it("names the word an env var or identifier stands for, and nothing else", () => {
+    expect(nameOf(at("identifier", "createLogger()"))).toBe("createLogger");
+    expect(nameOf(at("env", "MAPLE_BRANCH"))).toBe("MAPLE_BRANCH");
+    expect(nameOf(at("path", "docs/gate.md"))).toBeUndefined();
+    expect(wordsIn('required(env, "GITHUB_TOKEN")')).toEqual(
+      new Set(["required", "env", "GITHUB_TOKEN"]),
+    );
   });
 });
 

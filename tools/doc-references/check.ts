@@ -81,6 +81,99 @@ export function extractReferences(
   return found;
 }
 
+/** One block of prose: consecutive non-blank lines outside fenced code and headings. */
+export interface Paragraph {
+  end: number;
+  file: string;
+  references: Reference[];
+  start: number;
+  text: string;
+}
+
+/** Every paragraph in one document, each with the references on its lines. */
+export function extractParagraphs(
+  file: string,
+  text: string,
+  roots: ReadonlySet<string>,
+): Paragraph[] {
+  const references = extractReferences(file, text, roots);
+  const found: Paragraph[] = [];
+  let lines: string[] = [];
+  let start = 0;
+  const close = (end: number) => {
+    if (lines.length > 0) {
+      const own = references.filter((one) => one.line >= start && one.line <= end);
+      found.push({ end, file, references: own, start, text: lines.join("\n") });
+    }
+    lines = [];
+  };
+  let fence: string | undefined;
+  text.split("\n").forEach((content, index) => {
+    const marker = /^\s*(`{3,}|~{3,})/.exec(content)?.[1];
+    const opens = marker !== undefined && (fence === undefined || marker.startsWith(fence));
+    if (opens) fence = fence === undefined ? marker : undefined;
+    if (opens || fence !== undefined || content.trim() === "" || /^#{1,6}\s/.test(content)) {
+      close(index);
+      return;
+    }
+    if (lines.length === 0) start = index + 1;
+    lines.push(content);
+  });
+  close(text.split("\n").length);
+  return found;
+}
+
+/** The word an env or identifier reference stands for, as the index tokenises code. */
+export function nameOf(reference: Reference): string | undefined {
+  if (reference.kind === "env") return reference.text;
+  return reference.kind === "identifier" ? reference.text.replace(/\(\)$/, "") : undefined;
+}
+
+/** Every word in `text`, split the way the index splits code. */
+export function wordsIn(text: string): Set<string> {
+  return new Set(text.match(/[A-Za-z_$][\w$]*/g) ?? []);
+}
+
+/**
+ * Whether a path or link reference names `file` itself, or an import names the
+ * package entry or subpath source that holds it. A directory names nothing:
+ * `packages/core` reaches every change in it, which says nothing about a paragraph.
+ */
+export function pointsAt(reference: Reference, file: string): boolean {
+  const from = posix.dirname(reference.file);
+  switch (reference.kind) {
+    case "import":
+      return importHolds(reference.text.replace(/(?<=.)@[\w.-]+$/, ""), file);
+    case "link": {
+      const target = decodeURI(reference.text.split("#")[0] ?? "");
+      return target !== "" && posix.normalize(posix.join(from, target)) === file;
+    }
+    case "path": {
+      const path = reference.text.replace(/:\d+$/, "").replace(/\/$/, "").replace(/^\.\//, "");
+      const local = posix.normalize(posix.join(from, path));
+      return path === file || local === file || file.endsWith(`/${path}`);
+    }
+    default:
+      return false;
+  }
+}
+
+function holds(target: string, file: string): boolean {
+  const dir = target.replace(/\/$/, "");
+  return dir !== "" && dir !== "." && (file === dir || file.startsWith(`${dir}/`));
+}
+
+/** A bare package holds its manifest and entry; a subpath holds its own source. */
+function importHolds(specifier: string, file: string): boolean {
+  const match = /^@maple-kit\/([a-z-]+)(?:\/(.+))?$/.exec(specifier);
+  if (match === null) return false;
+  const root = `packages/${match[1] ?? ""}`;
+  const sub = match[2];
+  if (sub === undefined) return file === `${root}/package.json` || file === `${root}/src/index.ts`;
+  const source = `${root}/src/${sub}`;
+  return holds(source, file) || file === `${source}.ts` || file === `${source}.tsx`;
+}
+
 /** The contents of each single-backtick code span on a line. */
 function inlineCode(line: string): string[] {
   return [...line.matchAll(/(?<!`)`([^`]+)`(?!`)/g)].map((match) => (match[1] ?? "").trim());
@@ -214,7 +307,7 @@ export function buildIndex(root: string, files: readonly string[]): ReferenceInd
   for (const file of files) {
     if (!isIndexed(file)) continue;
     const text = readFileSync(join(root, file), "utf8");
-    for (const word of text.match(/[A-Za-z_$][\w$]*/g) ?? []) words.add(word);
+    for (const word of wordsIn(text)) words.add(word);
     if (/^packages\/[^/]+\/package\.json$/.test(file)) {
       for (const name of importsOf(JSON.parse(text) as { name: string })) imports.add(name);
     }
