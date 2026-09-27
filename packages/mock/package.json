@@ -1,6 +1,6 @@
 {
   "name": "@maple-kit/mock",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "Rewrites a page's API responses into the state a reviewer asked to see",
   "license": "Apache-2.0",
   "type": "module",

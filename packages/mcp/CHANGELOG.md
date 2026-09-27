@@ -1,5 +1,11 @@
 # @maple-kit/mcp
 
+## 0.12.0
+
+### Patch Changes
+
+- @maple-kit/core@0.12.0
+
 ## 0.11.0
 
 ### Patch Changes

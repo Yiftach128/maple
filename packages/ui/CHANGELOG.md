@@ -1,5 +1,55 @@
 # @maple-kit/ui
 
+## 0.12.0
+
+### Minor Changes
+
+- 8927eb3: The composer's quiet control reads **Save as draft** instead of **Keep**, and a
+  saved draft keeps its leaf on the page. The leaf is drawn in the muted outline
+  unsent comments already used, with no number, since a draft has no address
+  until it is published. Pointing at it rings what it is on; clicking it opens
+  the composer on what was written. The draft being written is left out while
+  the composer is open, because the composer's own ring is already on it.
+
+  Breaking: `KEEP_LABEL` is renamed `SAVE_DRAFT_LABEL`. `MarkProps.address` is
+  optional, and `markLabel` and `markTitle` take a missing address and a
+  `"draft"` status for that leaf.
+
+### Patch Changes
+
+- 8927eb3: ⌘+Enter (Ctrl+Enter off macOS) in the composer's field publishes the comment,
+  as the Publish button does. Enter and Shift+Enter still start a new line, and a
+  blank body is not published.
+- 8927eb3: Hovering a mark on the page draws its ring again. React builds
+  `onPointerEnter` from `pointerover`, and skips it when the pointer arrives from
+  a node another React root manages, trusting that root to have sent the enter.
+  The host application's root never sees the overlay's shadow tree, so on any
+  React page the mark was never entered: a row in the island rang its target, the
+  leaf itself did not. Marks and rows now listen for `pointerover` and
+  `pointerout` and ignore moves between an element and its own children.
+- d8bedc3: The ring's label moves out of the page's own text. It is opaque, so a label
+  dropped into a line of the page hid the middle of the line and left both ends
+  showing, which read as the page having broken rather than as Maple naming
+  something. Developer detail is where it bit: the source line gives the label a
+  second row, and a gap that held one row no longer held it.
+
+  The label now takes the first of its ring's four corners that the window holds
+  and the page has not written in — above left, below left, above right, below
+  right, in that order, so the common case is the corner it has always used. The
+  question asked of a corner is whether a glyph is painted in it, measured from
+  the line boxes of the text runs there, rather than whether some element's box
+  reaches it: a card's own padding is somewhere a label may sit. The corner is
+  settled when the page is still rather than per scrolled frame, because a label
+  that re-decides mid-scroll flickers.
+
+  When every corner has text in it there is nowhere better to go, so the label
+  stays where a reader looks for it and carries a shadow, which says it is
+  floating over the page rather than part of it.
+
+- @maple-kit/core@0.12.0
+  - @maple-kit/mock@0.12.0
+  - @maple-kit/react@0.12.0
+
 ## 0.11.0
 
 ### Minor Changes
