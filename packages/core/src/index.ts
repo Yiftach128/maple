@@ -60,7 +60,7 @@ export { MapleStoreError } from "./errors.js";
 export { BLOCKING_STATUSES, decideGate, publishGate } from "./gate/index.js";
 export type { GateContext, GateOptions } from "./gate/index.js";
 export { CyclicValueError, stableStringify } from "./lib/stable-stringify.js";
-export { consoleSink, createLogger, LEVEL_RANK, memorySink } from "./logger/index.js";
+export { consoleSink, createLogger, LEVEL_RANK, memorySink, streamSink } from "./logger/index.js";
 export type {
   LogFields,
   Logger,
@@ -69,6 +69,7 @@ export type {
   LogRecord,
   LogSink,
   MemorySink,
+  TextStream,
 } from "./logger/index.js";
 export { createCommentStore } from "./store.js";
 export type { CommentStore } from "./store.js";

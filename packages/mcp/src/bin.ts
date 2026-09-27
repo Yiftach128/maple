@@ -6,12 +6,14 @@ import {
   requireApprovalFromEnvironment,
   storeFromEnvironment,
 } from "./config.js";
+import { serverLogger } from "./logger.js";
 import { createMapleServer } from "./server.js";
 
 const gate = gateFromEnvironment(process.env);
 const server = createMapleServer({
   store: storeFromEnvironment(process.env),
   requireApproval: requireApprovalFromEnvironment(process.env),
+  logger: serverLogger(),
   ...(gate === undefined ? {} : { gate }),
 });
 

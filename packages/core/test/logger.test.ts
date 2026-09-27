@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createLogger } from "../src/logger/logger.js";
 import { memorySink } from "../src/logger/sinks/memory.js";
+import { streamSink } from "../src/logger/sinks/stream.js";
 
 import type { LogSink } from "../src/logger/types.js";
 
@@ -79,5 +80,40 @@ describe("createLogger", () => {
     createLogger({ sinks: [sink] }).info("when");
 
     expect(sink.records[0]?.at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+  });
+});
+
+describe("streamSink", () => {
+  function captured(): { write(text: string): void; lines: string[] } {
+    const lines: string[] = [];
+    return { lines, write: (text) => lines.push(text) };
+  }
+
+  it.each([
+    ["a bare message", undefined, /^\S+Z info {2}hello\n$/],
+    ["fields as JSON", { branch: "main" }, /^\S+Z info {2}hello {"branch":"main"}\n$/],
+  ])("writes one line with %s", (_, fields, expected) => {
+    const stream = captured();
+    createLogger({ sinks: [streamSink(stream)] }).info("hello", fields);
+
+    expect(stream.lines).toHaveLength(1);
+    expect(stream.lines[0]).toMatch(expected);
+  });
+
+  it("puts an error's stack after the line", () => {
+    const stream = captured();
+    createLogger({ sinks: [streamSink(stream)] }).error("failed", new Error("boom"));
+
+    expect(stream.lines[0]).toMatch(/^\S+Z error failed\nError: boom\n/);
+  });
+
+  it("still writes the line when the fields cannot be serialised", () => {
+    const stream = captured();
+    const loop: Record<string, unknown> = {};
+    loop["self"] = loop;
+
+    createLogger({ sinks: [streamSink(stream)] }).warn("odd", loop);
+
+    expect(stream.lines[0]).toMatch(/warn {2}odd \[unserialisable fields\]\n$/);
   });
 });
