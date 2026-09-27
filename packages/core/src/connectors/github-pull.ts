@@ -110,10 +110,18 @@ async function ofCommit(api: PullReader, commit: string): Promise<number | undef
   return (await api.get<PullRequest[]>(path))[0]?.number;
 }
 
-/** The ordinary case: the identifier is the head branch's own name. */
+/**
+ * The ordinary case: the identifier is the head branch's own name. An open pull
+ * request beats a newer closed duplicate; a closed one is used only when none is.
+ */
 async function ofHead(api: PullReader, branch: string): Promise<number | undefined> {
   const head = encodeURIComponent(`${api.owner}:${branch}`);
-  const path = `/repos/${api.owner}/${api.repo}/pulls?head=${head}&state=all&per_page=1`;
+  const base = `/repos/${api.owner}/${api.repo}/pulls?head=${head}&per_page=1`;
+
+  const open = (await api.get<PullRequest[]>(`${base}&state=open`))[0]?.number;
+  if (open !== undefined) return open;
+
+  const path = `${base}&state=all&sort=updated&direction=desc`;
   return (await api.get<PullRequest[]>(path))[0]?.number;
 }
 

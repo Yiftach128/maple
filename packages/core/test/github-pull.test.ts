@@ -6,6 +6,7 @@ import { createGitHubFake, pullFor } from "./msw/github.js";
 import { createTestServer, useTestServer } from "./msw/server.js";
 
 import type { GitHubStoreOptions } from "../src/connectors/index.js";
+import type { HeadPull } from "./msw/github.js";
 
 const github = createGitHubFake();
 const server = createTestServer(...github.handlers);
@@ -43,6 +44,61 @@ describe("finding the pull request from a commit", () => {
 
     const page = await connector.list({ branch: "pla-1903" });
     expect(page.comments.map((one) => one.body)).toEqual(["the gap"]);
+  });
+});
+
+/** A duplicate opened and closed is newer than the pull request still in review. */
+describe("finding the pull request on a head branch", () => {
+  const BRANCH = "feat/duplicated";
+  const pull = (number: number, state: HeadPull["state"], updated: string): HeadPull => ({
+    number,
+    state,
+    updated,
+  });
+
+  it.each<{ name: string; pulls: HeadPull[]; expected: number }>([
+    {
+      name: "an open one over a newer closed one",
+      pulls: [pull(12, "closed", "2026-09-02"), pull(11, "open", "2026-09-01")],
+      expected: 11,
+    },
+    {
+      name: "the only open one among several closed",
+      pulls: [
+        pull(23, "closed", "2026-09-05"),
+        pull(22, "open", "2026-08-01"),
+        pull(21, "closed", "2026-09-04"),
+      ],
+      expected: 22,
+    },
+    {
+      name: "the most recently updated when every one is closed",
+      pulls: [pull(32, "closed", "2026-09-01"), pull(31, "closed", "2026-09-03")],
+      expected: 31,
+    },
+    {
+      name: "a merged or closed one when it is the only one",
+      pulls: [pull(41, "closed", "2026-09-01")],
+      expected: 41,
+    },
+  ])("takes $name", async ({ pulls, expected }) => {
+    github.head(BRANCH, ...pulls);
+    await store().append(sampleComment({ branch: BRANCH }));
+
+    expect(github.commentsOn(expected)).toHaveLength(1);
+  });
+
+  it("finds nothing when the head has no pull request at all", async () => {
+    github.head(BRANCH);
+    const page = await store().list({ branch: BRANCH });
+
+    expect(page).toEqual({ comments: [] });
+  });
+
+  it("rejects with GitHub's status when the lookup fails", async () => {
+    github.fail(BRANCH, 502);
+
+    await expect(store().list({ branch: BRANCH })).rejects.toThrow(/GitHub 502/);
   });
 });
 

@@ -19,6 +19,14 @@ interface StoredComment {
   body: string;
 }
 
+/** One pull request on a head branch, as `head()` records it. */
+export interface HeadPull {
+  readonly number: number;
+  readonly state: "open" | "closed";
+  /** ISO timestamp, compared when a lookup asks for `sort=updated`. */
+  readonly updated: string;
+}
+
 /** A fake repository, with its pull requests and their comments. */
 export interface GitHubFake {
   readonly handlers: RequestHandler[];
@@ -36,6 +44,10 @@ export interface GitHubFake {
   commit(sha: string, branch: string): void;
   /** How many pull-request lookups have been served, for asserting a cache. */
   lookups(): number;
+  /** The pull requests on a head branch, newest created first, as GitHub lists them. */
+  head(branch: string, ...pulls: readonly HeadPull[]): void;
+  /** Makes every head lookup for a branch answer with a GitHub error. */
+  fail(branch: string, status: number): void;
 }
 
 /**
@@ -46,6 +58,8 @@ export interface GitHubFake {
 export function createGitHubFake(owner = "maple-kit", repo = "app"): GitHubFake {
   const comments = new Map<number, StoredComment[]>();
   const commits = new Map<string, string>();
+  const heads = new Map<string, readonly HeadPull[]>();
+  const failing = new Map<string, number>();
   let opened: readonly string[] = [];
   let lookups = 0;
   let nextId = 1000;
@@ -80,6 +94,13 @@ export function createGitHubFake(owner = "maple-kit", repo = "app"): GitHubFake 
       // identifier with no slash is a ticket or a hostname label, which is
       // exactly the case `PullLookup.matches` exists for, so it finds nothing.
       const branch = head.slice(head.indexOf(":") + 1);
+      const status = failing.get(branch);
+      if (status !== undefined) {
+        return HttpResponse.json({ message: "Server Error" }, { status });
+      }
+      const recorded = heads.get(branch);
+      if (recorded) return HttpResponse.json(listHead(branch, recorded, request.url));
+
       const known = branch.includes("/") && !branch.startsWith("no-pull/");
       return HttpResponse.json(known ? [{ number: pullFor(branch), head: { ref: branch } }] : []);
     }),
@@ -155,6 +176,8 @@ export function createGitHubFake(owner = "maple-kit", repo = "app"): GitHubFake 
     reset: () => {
       comments.clear();
       commits.clear();
+      heads.clear();
+      failing.clear();
       opened = [];
       lookups = 0;
       writes.length = 0;
@@ -172,7 +195,32 @@ export function createGitHubFake(owner = "maple-kit", repo = "app"): GitHubFake 
       commits.set(sha, branch);
     },
     lookups: () => lookups,
+    head: (branch, ...pulls) => {
+      heads.set(branch, pulls);
+    },
+    fail: (branch, status) => {
+      failing.set(branch, status);
+    },
   };
+}
+
+/** Filters by `state` and orders by `sort` the way `GET /pulls` does. */
+function listHead(branch: string, pulls: readonly HeadPull[], url: string): unknown[] {
+  const params = new URL(url).searchParams;
+  const state = params.get("state") ?? "open";
+  const perPage = Number(params.get("per_page") ?? "30");
+
+  const kept = pulls.filter((pull) => state === "all" || pull.state === state);
+  const ordered =
+    params.get("sort") === "updated"
+      ? [...kept].sort((a, b) => b.updated.localeCompare(a.updated))
+      : kept;
+  return ordered.slice(0, perPage).map((pull) => ({
+    number: pull.number,
+    state: pull.state,
+    updated_at: pull.updated,
+    head: { ref: branch },
+  }));
 }
 
 /** A stable pull number per branch, so a branch always lands in one place. */
