@@ -35,9 +35,14 @@ export const ENVIRONMENT: readonly EnvironmentVariable[] = [
       "The branch the Stop hook checks, else the one checked out. The server ignores it.",
   },
   {
+    name: "MAPLE_URL",
+    secret: false,
+    description: "The deployed route's mount URL. A resolve asks it to republish the gate.",
+  },
+  {
     name: "MAPLE_GATE_TOKEN",
     secret: true,
-    description: "The gate App's installation token. Absent, a resolve publishes no verdict.",
+    description: "For CI only: the gate App's installation token. Not with `MAPLE_URL`.",
   },
   {
     name: "MAPLE_GATE_APP_ID",

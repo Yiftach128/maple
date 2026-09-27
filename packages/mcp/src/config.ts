@@ -10,7 +10,9 @@ import { createCommentStore } from "@maple-kit/core";
 import { githubGate, githubStore } from "@maple-kit/core/connectors";
 
 import { describeVariable } from "./environment.js";
+import { routeRefresh } from "./refresh.js";
 
+import type { GateRefresh } from "./refresh.js";
 import type { CommentStore, GateConnector } from "@maple-kit/core";
 
 /** Builds the store named by `MAPLE_STORE`, or the default, wrapped for use. */
@@ -39,6 +41,7 @@ export function storeFromEnvironment(
 export function gateFromEnvironment(
   env: Readonly<Record<string, string | undefined>>,
 ): GateConnector | undefined {
+  onePublisher(env);
   const token = env["MAPLE_GATE_TOKEN"];
   if (!token) return undefined;
 
@@ -50,6 +53,31 @@ export function gateFromEnvironment(
     ...(appId === undefined ? {} : { appId }),
     ...(env["MAPLE_GITHUB_API"] === undefined ? {} : { baseUrl: env["MAPLE_GITHUB_API"] }),
   });
+}
+
+/**
+ * The route to ask for a gate refresh, or undefined where `MAPLE_URL` is
+ * unset. The route holds the gate's credential; this side sends only the
+ * branch and `GITHUB_TOKEN`, which the route checks can push.
+ */
+export function refreshFromEnvironment(
+  env: Readonly<Record<string, string | undefined>>,
+): GateRefresh | undefined {
+  onePublisher(env);
+  const url = env["MAPLE_URL"];
+  if (!url) return undefined;
+
+  return routeRefresh({ url, token: required(env, "GITHUB_TOKEN") });
+}
+
+/** Two ways to publish is two verdicts racing; refusing to start says which to drop. */
+function onePublisher(env: Readonly<Record<string, string | undefined>>): void {
+  if (!env["MAPLE_URL"] || !env["MAPLE_GATE_TOKEN"]) return;
+  throw new Error(
+    "MAPLE_URL and MAPLE_GATE_TOKEN are both set; Maple's MCP server cannot start with both. " +
+      "Keep MAPLE_URL on a developer machine, where the route publishes the gate, " +
+      "and MAPLE_GATE_TOKEN for CI only.",
+  );
 }
 
 /** Whether the gate is held until somebody approves the preview. */

@@ -26,7 +26,7 @@ Both need Node 24 or later. Run them with
 `npx -y -p @maple-kit/mcp <bin>`; the package name is not a bin, so
 `npx @maple-kit/mcp` alone does not work.
 
-## 2. Pick the tokens
+## 2. Pick the token, and how the gate moves
 
 **`GITHUB_TOKEN`** is what reads and writes the comments. Maple keeps them in a
 pull-request conversation comment, so the token needs `Pull requests: Read and
@@ -34,12 +34,20 @@ write` on the repository (a fine-grained token; `Metadata: Read` comes with
 it). Read-only is enough to list, but `resolve_comment` rewrites that comment
 and fails without write.
 
-**`MAPLE_GATE_TOKEN`** is optional. With it, `resolve_comment` also republishes
-the `maple/visual-review` check. It must be the gate App's own installation
-token, never `GITHUB_TOKEN` — `docs/github-auth.md` says why. Skip it and the
-check updates on the next push instead.
+**`MAPLE_URL`** is optional, and it is how the check moves on a resolve. Set it
+to the mount URL of a deployed Maple route whose host turned on `gateRefresh`
+(the `setup-maple-org` skill), usually the preview under review:
+`https://web-482.preview.acme.dev/api/maple`. `resolve_comment` then asks that
+route to republish `maple/visual-review`, sending the branch and
+`GITHUB_TOKEN`. That token needs push access to the repository for the route to
+act on it. No gate credential is ever on this machine; `docs/github-auth.md`
+says why. Skip it and the check updates on the next push instead.
 
-Neither value goes in a file. Export them into the shell that starts the
+**`MAPLE_GATE_TOKEN`** is for CI only: the gate App's own installation token,
+never `GITHUB_TOKEN`, and it expires an hour after it is minted. Do not set it
+next to `MAPLE_URL`; the server refuses to start with both.
+
+Neither token goes in a file. Export them into the shell that starts the
 client, for example with `op run --env-file .env -- claude`, and reference
 them from `.mcp.json` with `${VAR}`.
 
@@ -48,7 +56,8 @@ them from `.mcp.json` with `${VAR}`.
 **With the Maple Claude Code plugin installed, skip this section and the
 next.** The plugin runs the server and the Stop hook, and both read
 `GITHUB_TOKEN`, `MAPLE_GITHUB_OWNER` and `MAPLE_GITHUB_REPO` from the
-environment Claude Code starts in, so export all three there. Go to section 5.
+environment Claude Code starts in, so export all three there, and `MAPLE_URL`
+too for the server to refresh the gate. Go to section 5.
 
 ```json
 {
@@ -68,16 +77,17 @@ environment Claude Code starts in, so export all three there. Go to section 5.
 
 What the server reads, from `packages/mcp/src/config.ts`:
 
-| Variable                 | Required | Notes                                                                           |
-| ------------------------ | -------- | ------------------------------------------------------------------------------- |
-| `GITHUB_TOKEN`           | yes      | Section 2.                                                                      |
-| `MAPLE_GITHUB_OWNER`     | yes      | Organisation or user.                                                           |
-| `MAPLE_GITHUB_REPO`      | yes      | Repository name.                                                                |
-| `MAPLE_STORE`            | no       | `github`, the default and the only value accepted. Anything else fails.         |
-| `MAPLE_GITHUB_API`       | no       | API base URL, for GitHub Enterprise Server.                                     |
-| `MAPLE_GATE_TOKEN`       | no       | Section 2. Unset means no gate publish.                                         |
-| `MAPLE_GATE_APP_ID`      | no       | The gate App's id. Only read when `MAPLE_GATE_TOKEN` is set.                    |
-| `MAPLE_REQUIRE_APPROVAL` | no       | Exactly `true` to hold the gate for an approval. Match the route and CI action. |
+| Variable                 | Required | Notes                                                                                                           |
+| ------------------------ | -------- | --------------------------------------------------------------------------------------------------------------- |
+| `GITHUB_TOKEN`           | yes      | Section 2.                                                                                                      |
+| `MAPLE_GITHUB_OWNER`     | yes      | Organisation or user.                                                                                           |
+| `MAPLE_GITHUB_REPO`      | yes      | Repository name.                                                                                                |
+| `MAPLE_STORE`            | no       | `github`, the default and the only value accepted. Anything else fails.                                         |
+| `MAPLE_GITHUB_API`       | no       | API base URL, for GitHub Enterprise Server.                                                                     |
+| `MAPLE_URL`              | no       | Section 2. The route's mount URL. Unset means no gate refresh on resolve.                                       |
+| `MAPLE_GATE_TOKEN`       | no       | Section 2. CI only; not with `MAPLE_URL`.                                                                       |
+| `MAPLE_GATE_APP_ID`      | no       | The gate App's id. Only read when `MAPLE_GATE_TOKEN` is set.                                                    |
+| `MAPLE_REQUIRE_APPROVAL` | no       | With `MAPLE_GATE_TOKEN`, exactly `true` to hold for an approval. The route's own setting wins with `MAPLE_URL`. |
 
 A missing required value makes the server exit at startup, so the client shows
 it as a failed server rather than a tool error.
@@ -90,7 +100,7 @@ argument instead:
 | `list_comments`       | `branch`, `statuses?`             | Every comment on the branch, newest first, filtered by status.  |
 | `wait_for_comments`   | `branch`, `cursor?`, `timeoutMs?` | `{ status: "comments" \| "timeout", cursor, comments }`         |
 | `get_comment_context` | `id`, `branch`                    | The comment, its anchor rungs, its conditions, any mock replay. |
-| `resolve_comment`     | `id`, `sha`, `note?`              | The updated comment. Publishes the gate if configured.          |
+| `resolve_comment`     | `id`, `sha`, `note?`              | The updated comment. Refreshes the gate if configured.          |
 
 `statuses` is any of `open`, `resolved`, `needs_reverify`, `orphaned`.
 `branch` is the pull request's **head branch name**, not its number.
@@ -197,9 +207,15 @@ fails later against GitHub; `${VAR:-}` expands to empty and fails here instead.
 requests: Read and write`, or cannot see the repository. GitHub answers 404 for
 a repository a token cannot see.
 
-**Resolves succeed but `maple/visual-review` does not move.** The gate publish
-never throws and the server has no logger, so its failures are silent. Most
-often `MAPLE_GATE_TOKEN` was a static installation token, and those expire
-after one hour: mint a fresh one before the session, or leave the variable
-unset and let the next push update the check. A 403 on the check run usually
-means `MAPLE_GATE_APP_ID` is missing; `docs/gate.md` has that case.
+**Resolves succeed but `maple/visual-review` does not move.** A gate refresh
+never fails a resolve; it writes the reason to the server's stderr, which the
+client keeps in its MCP log. With `MAPLE_URL` set, the line names the route's
+answer: `403` means `GITHUB_TOKEN` cannot push to the repository, `401` that
+GitHub did not accept it, and `404` that `MAPLE_URL` is not the route's mount
+URL or its host has not turned on `gateRefresh`. With `MAPLE_GATE_TOKEN`, a
+`401` is the token's hour running out; use `MAPLE_URL` instead. A 403 on the
+check run usually means `MAPLE_GATE_APP_ID` is missing; `docs/gate.md` has that
+case.
+
+**Server fails to start: `MAPLE_URL and MAPLE_GATE_TOKEN are both set`.**
+Remove `MAPLE_GATE_TOKEN` from the agent's environment; it belongs in CI.

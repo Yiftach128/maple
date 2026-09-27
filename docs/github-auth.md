@@ -157,6 +157,32 @@ holding `Checks` and `Contents` for a gate that is not built yet has all of the
 exposure and none of the benefit. Permissions are cheap to add when the gate
 arrives and expensive to have been carrying in the meantime.
 
+### No gate credential leaves the server
+
+The gate App's key and the installation tokens minted from it stay on the SDK
+route. An agent that resolves a comment through `maple-mcp` and wants the check
+to move does not get one: it asks the route's `POST /gate/refresh` with its own
+`GITHUB_TOKEN`, the route checks that token can push to the repository, and the
+route decides the verdict and publishes it. `docs/gate.md` has the request.
+
+Two simpler shapes were rejected.
+
+**The App's private key on the developer machine.** It mints tokens for every
+repository the installation covers, not the one being worked on, and it does
+not expire. A key on a laptop is a key in every backup, every dotfile sync and
+every agent transcript that ever printed the environment.
+
+**Short-lived installation tokens handed out by the route.** An hour sounds
+narrow, but any token the gate App mints can write `maple/visual-review` with
+any conclusion. A ruleset pins the App, not the verdict, so whoever held one
+could publish a green check over open comments, on any pull request, for the
+hour. The route's refresh takes a branch and nothing else, so the verdict is
+always the one the store decides.
+
+Push access is the bar because it is the power the check already concedes:
+anyone who can push can move the check by pushing. The refresh gives them
+nothing a commit would not.
+
 ## Two settings that decide whether this works
 
 **Expire user authorisation tokens — off.** With expiry on, a user-to-server

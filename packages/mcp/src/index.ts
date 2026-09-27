@@ -1,11 +1,14 @@
 export {
   branchFromEnvironment,
   gateFromEnvironment,
+  refreshFromEnvironment,
   requireApprovalFromEnvironment,
   storeFromEnvironment,
 } from "./config.js";
 export { createToolHandlers } from "./handlers.js";
 export type { CommentContext, HandlerOptions, ToolHandlers } from "./handlers.js";
+export { routeRefresh } from "./refresh.js";
+export type { GateRefresh, RouteRefreshOptions } from "./refresh.js";
 export {
   currentBranch,
   decideSessionStop,

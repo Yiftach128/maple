@@ -94,7 +94,8 @@ a process rather than a library. `docs/agent-loop.md` covers it.
 | `MAPLE_GITHUB_API`       | No     | The API root, for Enterprise Server.                                              |
 | `MAPLE_STORE`            | No     | `github`, the default and so far the only one.                                    |
 | `MAPLE_BRANCH`           | No     | The branch the Stop hook checks, else the one checked out. The server ignores it. |
-| `MAPLE_GATE_TOKEN`       | Yes    | The gate App's installation token. Absent, a resolve publishes no verdict.        |
+| `MAPLE_URL`              | No     | The deployed route's mount URL. A resolve asks it to republish the gate.          |
+| `MAPLE_GATE_TOKEN`       | Yes    | For CI only: the gate App's installation token. Not with `MAPLE_URL`.             |
 | `MAPLE_GATE_APP_ID`      | No     | The gate App's id, so it updates its own check run rather than another's.         |
 | `MAPLE_REQUIRE_APPROVAL` | No     | `true` to hold the gate until somebody approves, matching the route and CI.       |
 
@@ -103,11 +104,10 @@ a process rather than a library. `docs/agent-loop.md` covers it.
 This token is an agent's, not a reviewer's, and it belongs on a developer's
 machine or in CI — never in a preview environment.
 
-`MAPLE_GATE_TOKEN` is read once, as a static string, and an installation token
-expires an hour after it is minted. A server that outlives it publishes with a
-dead token: the resolve is still recorded, and the gate update fails with
-nothing logged, because `maple-mcp` configures no logger. Mint a fresh token
-for each session until the server can mint its own.
+On a developer machine, set `MAPLE_URL` and leave `MAPLE_GATE_TOKEN` unset: a
+resolve asks the route to republish the gate, and the gate App's credentials
+stay on the route. `MAPLE_GATE_TOKEN` is for CI, where a job lasts less than the
+hour an installation token lives. The server refuses to start with both.
 
 ## Where each one goes
 

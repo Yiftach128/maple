@@ -12,7 +12,7 @@ import { decideGate } from "./decide.js";
 import type { GateConnector } from "../connectors/types.js";
 import type { Logger } from "../logger/types.js";
 import type { CommentStore } from "../store.js";
-import type { Approval, Comment } from "../types.js";
+import type { Approval, Comment, GateVerdict } from "../types.js";
 
 /** How many comments are read back before the verdict stops being exact. */
 const PAGE = 100;
@@ -30,7 +30,7 @@ export async function publishGate(
   reviewUrl?: string,
 ): Promise<void> {
   try {
-    await publish(context, branch, reviewUrl);
+    await publishVerdict(context, branch, reviewUrl);
   } catch (error) {
     context.logger?.error(
       "Maple could not publish the merge gate; the comment's status was saved.",
@@ -51,9 +51,23 @@ export interface GateContext {
   readonly requireApproval?: boolean;
 }
 
-async function publish(context: GateContext, branch: string, reviewUrl?: string): Promise<void> {
+/** What was published, and on which commit. */
+export interface Published {
+  readonly sha: string;
+  readonly verdict: GateVerdict;
+}
+
+/**
+ * {@link publishGate} for a caller that asked for nothing but the publish, so a
+ * failure is its answer: it throws, and undefined means no head commit.
+ */
+export async function publishVerdict(
+  context: GateContext,
+  branch: string,
+  reviewUrl?: string,
+): Promise<Published | undefined> {
   const sha = await headOf(context, branch);
-  if (sha === undefined) return;
+  if (sha === undefined) return undefined;
 
   const approvals = await approvalsOn(context, branch);
   const verdict = decideGate(await commentsOn(context.store, branch), {
@@ -69,6 +83,7 @@ async function publish(context: GateContext, branch: string, reviewUrl?: string)
     verdict,
     ...(reviewUrl === undefined ? {} : { reviewUrl }),
   });
+  return { sha, verdict };
 }
 
 /**

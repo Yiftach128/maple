@@ -20,3 +20,4 @@ export { toNodeMiddleware } from "./node.js";
 
 export type { NodeMiddleware } from "./node.js";
 export type { MockPlanAnswer, MockPlanOptions } from "./plan.js";
+export type { GateRefreshOptions } from "./refresh.js";

@@ -11,6 +11,7 @@ import { describeIdentity, linkRecipe } from "@maple-kit/core/mock";
 
 import { clampWaitMs } from "./timeout.js";
 
+import type { GateRefresh } from "./refresh.js";
 import type {
   ListCommentsArgs,
   ResolveCommentArgs,
@@ -28,6 +29,11 @@ export interface HandlerOptions {
    * check keeps holding until a push, which is what the route's publish avoids.
    */
   readonly gate?: GateConnector;
+  /**
+   * Asks the deployed route to republish instead, so no gate credential is
+   * held here. The route decides the verdict and `requireApproval` is its own.
+   */
+  readonly refresh?: GateRefresh;
   /** True when the gate is held until somebody approves the preview. */
   readonly requireApproval?: boolean;
   /** Where a failed publish is reported. Silent when absent. */
@@ -163,6 +169,10 @@ export function createToolHandlers(options: HandlerOptions): ToolHandlers {
  * already recorded, and a gate that fails a resolve is worse than a stale one.
  */
 async function report(options: HandlerOptions, branch: string): Promise<void> {
+  if (options.refresh) {
+    await options.refresh(branch, options.logger);
+    return;
+  }
   if (!options.gate) return;
 
   await publishGate(

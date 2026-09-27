@@ -269,6 +269,51 @@ fire-and-forget publish would be lost exactly where Maple is most often
 deployed. Awaiting costs the reviewer a few hundred milliseconds and buys them a
 check that has settled by the time they look at it.
 
+### Refreshing on an agent's behalf
+
+An agent resolves comments through `maple-mcp`, on a developer's machine, and
+the check should move then too. The route's `POST /gate/refresh` is how it does,
+without the machine ever holding a gate credential:
+
+```http
+POST /api/maple/gate/refresh
+Authorization: Bearer <the caller's own GitHub token>
+Content-Type: application/json
+
+{ "branch": "web-482" }
+```
+
+The route asks GitHub for `GET /repos/{owner}/{repo}` with that token and
+requires `permissions.push`. Push is the bar because anyone who can push can
+already move the check by pushing. It then reads the store, runs `decideGate`
+and publishes with the same `gate` a resolve in the overlay uses. The body
+names a branch and nothing else: a verdict or a commit the caller sends is
+ignored, for the reason [where the commit comes from](#where-the-commit-comes-from)
+gives.
+
+| Status | Meaning                                                                         |
+| ------ | ------------------------------------------------------------------------------- |
+| 200    | `{ branch, sha, verdict: { conclusion, reason, open, total } }`, as published.  |
+| 400    | No `branch`.                                                                    |
+| 401    | No bearer token, GitHub did not accept it, or the store resolver returned null. |
+| 403    | The token cannot push to the repository, or cannot see it.                      |
+| 404    | `gateRefresh` or `gate` is not configured on this route.                        |
+| 409    | The store names no head commit for the branch, so nothing was published.        |
+| 500    | GitHub or the gate failed. The log says which; the token is never in it.        |
+
+Unlike a resolve, a refresh answers with the failure rather than swallowing it:
+publishing is the whole request, so a caller that asked for nothing else is
+told when it did not happen.
+
+`RouteOptions.gateRefresh` switches it on and names the repository the token
+is checked against. Its `store` builds the store on the caller's token; without
+it the route's own `store` is used, and a resolver is handed the request as it
+came, bearer header included. The push answer is cached for a minute, keyed by
+a SHA-256 of the token so the token itself is not held. Each refresh asks the
+`gate` resolver again, so an installation token that expired is re-minted
+rather than reused. `docs/github-auth.md` has why this shape and not the two
+simpler ones.
+
 ### Two publishers, one check name
 
 The action publishes at push time and the route publishes at resolve time, and
@@ -306,7 +351,7 @@ not satisfy it.
 | Who publishes     | Pin                     | Why                                                                                  |
 | ----------------- | ----------------------- | ------------------------------------------------------------------------------------ |
 | The action only   | GitHub Actions, `15368` | Every run comes from `github.token`.                                                 |
-| The gate App only | The gate App's own id   | The route and the MCP server both publish with its installation token.               |
+| The gate App only | The gate App's own id   | The route publishes with its installation token, for an agent's refresh too.         |
 | Both              | See below               | Each pin ignores the other publisher's runs, so it undoes half of what both are for. |
 
 With both publishers, pinning `15368` means a reviewer's resolve publishes a

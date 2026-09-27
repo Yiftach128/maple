@@ -392,10 +392,19 @@ gate: async () =>
     token: await installation.token(),
     appId: process.env.MAPLE_GATE_APP_ID!,
   }),
+// Lets an agent's `maple-mcp` ask for a republish with its own token.
+gateRefresh: {
+  owner: "acme",
+  repo: "web",
+  store: (token) => createCommentStore(githubStore({ owner: "acme", repo: "web", token })),
+},
 ```
 
 `gate` is a resolver so the token is asked for on every request; a connector
-built once would hold a token that expired an hour later. `appId` is what lets
+built once would hold a token that expired an hour later. `gateRefresh` turns
+on `POST /api/maple/gate/refresh`, which an agent's `maple-mcp` calls with its
+`GITHUB_TOKEN` when `MAPLE_URL` points here; the route checks that token can
+push before it publishes, and hands it only to `store`. `appId` is what lets
 it find its own check run beside the one GitHub Actions created, and
 `docs/gate.md` says which of the two a ruleset should pin.
 

@@ -16,6 +16,7 @@ import { endLink, finishLink, githubState, linkFailure, startLink } from "./auth
 import { gateFor } from "./gate.js";
 import { createMockSchemas, MOCK_SCHEMA_KEYS, shapesFor } from "./mock.js";
 import { createMockPlanner } from "./plan.js";
+import { createRefreshAccess, handleRefresh } from "./refresh.js";
 
 import type {
   GateConnector,
@@ -39,6 +40,8 @@ import type { GitHubAuthOptions } from "./auth.js";
 import type { GateResolver } from "./gate.js";
 import type { MockRouteOptions, MockSchemas } from "./mock.js";
 import type { MockPlanner } from "./plan.js";
+import type { PushAccess } from "./push-access.js";
+import type { GateRefreshOptions } from "./refresh.js";
 
 /**
  * Chooses the store for one request. The shape a per-reviewer credential
@@ -76,6 +79,11 @@ export interface RouteOptions {
    * is recorded and nothing is reported.
    */
   readonly gate?: GateConnector | GateResolver;
+  /**
+   * Turns on `POST /gate/refresh`, which republishes the gate for a caller who
+   * can push to this repository. Absent, it answers 404. Needs `gate`.
+   */
+  readonly gateRefresh?: GateRefreshOptions;
   /**
    * Signs a reviewer in to GitHub with Device Flow. Absent, the three
    * `/auth/github` endpoints answer 404 and `/me` reports no link state.
@@ -126,6 +134,8 @@ interface Mount {
   readonly mock: MockSchemas | undefined;
   /** Undefined when nothing plans: no `mock.plan`, or a classifier without `plan`. */
   readonly planner: MockPlanner | undefined;
+  /** Undefined when `gateRefresh` is not configured. */
+  readonly refresh: PushAccess | undefined;
 }
 
 export function createMapleHandler(options: RouteOptions): (request: Request) => Promise<Response> {
@@ -137,6 +147,8 @@ export function createMapleHandler(options: RouteOptions): (request: Request) =>
     assist: options.assist === undefined ? undefined : createAssist(options.assist),
     mock,
     planner: mock && plan ? createMockPlanner(plan, mock) : undefined,
+    refresh:
+      options.gateRefresh === undefined ? undefined : createRefreshAccess(options.gateRefresh),
   };
 
   return async function handle(request: Request): Promise<Response> {
@@ -152,6 +164,17 @@ export function createMapleHandler(options: RouteOptions): (request: Request) =>
   };
 }
 
+/** The endpoints at one exact path, each with an arm of its own. */
+const FIXED: ReadonlyMap<string, (mount: Mount, request: Request, url: URL) => Promise<Response>> =
+  new Map([
+    ["/assist", (mount, request) => judge(mount, request)],
+    ["/mock/schema", (mount, request, url) => mockSchema(mount, request, url)],
+    ["/mock/plan", (mount, request) => mockPlan(mount, request)],
+    ["/mock/identity", (mount, request) => mockIdentity(mount, request)],
+    ["/auth/github", (mount, request) => link(mount.options, request)],
+    ["/gate/refresh", (mount, request) => refresh(mount, request)],
+  ]);
+
 async function dispatch(
   mount: Mount,
   request: Request,
@@ -159,11 +182,8 @@ async function dispatch(
   url: URL,
 ): Promise<Response> {
   const { options } = mount;
-  if (route === "/assist") return judge(mount, request);
-  if (route === "/mock/schema") return mockSchema(mount, request, url);
-  if (route === "/mock/plan") return mockPlan(mount, request);
-  if (route === "/mock/identity") return mockIdentity(mount, request);
-  if (route === "/auth/github") return link(options, request);
+  const fixed = FIXED.get(route);
+  if (fixed) return fixed(mount, request, url);
   if (route === "/media" || route.startsWith("/media/")) return media(options, request, route, url);
   if (route === "/approvals" || route.startsWith("/approvals/")) {
     return approvals(options, request, route, url);
@@ -184,6 +204,28 @@ async function dispatch(
   return request.method === "GET"
     ? listComments(store, url)
     : appendComment(options, store, request);
+}
+
+/** The gate refresh arm: 404 unless it was switched on. */
+async function refresh(mount: Mount, request: Request): Promise<Response> {
+  const { options, refresh: access } = mount;
+  if (options.gateRefresh === undefined || access === undefined) {
+    return json({ error: "Not found" }, 404);
+  }
+
+  return handleRefresh(
+    {
+      access,
+      options: options.gateRefresh,
+      gate: () => gateFor(options.gate, identityRequest(request)),
+      fallbackStore: () => storeFor(options, request),
+      ...(options.logger === undefined ? {} : { logger: options.logger }),
+      ...(options.requireApproval === undefined
+        ? {}
+        : { requireApproval: options.requireApproval }),
+    },
+    request,
+  );
 }
 
 /**

@@ -53,7 +53,8 @@ file. A missing value fails at startup rather than on the first tool call.
 | `MAPLE_GITHUB_API`       | No     | The API root, for Enterprise Server.                                              |
 | `MAPLE_STORE`            | No     | `github`, the default and so far the only one.                                    |
 | `MAPLE_BRANCH`           | No     | The branch the Stop hook checks, else the one checked out. The server ignores it. |
-| `MAPLE_GATE_TOKEN`       | Yes    | The gate App's installation token. Absent, a resolve publishes no verdict.        |
+| `MAPLE_URL`              | No     | The deployed route's mount URL. A resolve asks it to republish the gate.          |
+| `MAPLE_GATE_TOKEN`       | Yes    | For CI only: the gate App's installation token. Not with `MAPLE_URL`.             |
 | `MAPLE_GATE_APP_ID`      | No     | The gate App's id, so it updates its own check run rather than another's.         |
 | `MAPLE_REQUIRE_APPROVAL` | No     | `true` to hold the gate until somebody approves, matching the route and CI.       |
 
@@ -114,14 +115,18 @@ session's working directory.
   <img src="https://raw.githubusercontent.com/maple-kit/maple/main/docs/assets/features/merge-gate.gif" alt="A pull request's checks: maple/visual-review fails with two comments open, they resolve, the check passes and the merge button wakes up." width="480">
 </p>
 
-With `MAPLE_GATE_TOKEN` set, `resolve_comment` publishes `maple/visual-review`
-the way the overlay does, so an agent that resolves the last comment with
-nothing left to push does not leave the check holding on finished work.
+With `MAPLE_URL` set to a deployed route's mount URL, such as
+`https://web-482.preview.acme.dev/api/maple`, `resolve_comment` asks that route
+to republish `maple/visual-review`, so an agent that resolves the last comment
+with nothing left to push does not leave the check holding on finished work.
+The request carries the branch and `GITHUB_TOKEN`, which must be able to push
+to the repository. The route decides the verdict and publishes with the gate
+App's own credentials, which never leave it. A failed refresh is logged to
+stderr and the resolve is still recorded.
 
-The server reads that token once, as a string, and a GitHub App installation
-token expires an hour after it is minted. Past that, a resolve is still
-recorded but the gate update fails, and nothing logs it. Mint a fresh token
-for each session; the server does not mint its own yet.
+`MAPLE_GATE_TOKEN` is the other way, for CI: a gate App installation token the
+server publishes with directly. It expires an hour after it is minted, so it
+suits a job, not a session. Setting both fails at startup.
 
 ## Documentation
 

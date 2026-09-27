@@ -6,7 +6,8 @@
       "env": {
         "GITHUB_TOKEN": "${GITHUB_TOKEN:-}",
         "MAPLE_GITHUB_OWNER": "${MAPLE_GITHUB_OWNER:-}",
-        "MAPLE_GITHUB_REPO": "${MAPLE_GITHUB_REPO:-}"
+        "MAPLE_GITHUB_REPO": "${MAPLE_GITHUB_REPO:-}",
+        "MAPLE_URL": "${MAPLE_URL:-}"
       }
     }
   }

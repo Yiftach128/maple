@@ -83,7 +83,8 @@ tool call, where a client would show it as a tool error and bury it.
 | `GITHUB_TOKEN`                            | Server-side only. Never in a file; use `op run --env-file`.        |
 | `MAPLE_GITHUB_API`                        | For Enterprise Server.                                             |
 | `MAPLE_BRANCH`                            | The branch under review. Read by the Stop hook.                    |
-| `MAPLE_GATE_TOKEN`                        | The gate App's own installation token. Without it, see below.      |
+| `MAPLE_URL`                               | The deployed route's mount URL. A resolve asks it to publish.      |
+| `MAPLE_GATE_TOKEN`                        | CI only: the gate App's installation token. Not with `MAPLE_URL`.  |
 | `MAPLE_GATE_APP_ID`                       | Which App the runs belong to. `docs/gate.md` has the 403 it saves. |
 | `MAPLE_REQUIRE_APPROVAL`                  | `true` where the gate is held until somebody approves the preview. |
 
@@ -100,15 +101,18 @@ It publishes now, through the same `publishGate`, and never throws: the status
 is already recorded by the time it runs, and a gate that fails a resolve is
 worse than a stale one.
 
-Without `MAPLE_GATE_TOKEN` nothing is published and the behaviour is what it
-was. The token is the gate App's own and never the store's, because the store's
-is a reviewer's — `docs/github-auth.md` is the argument for keeping the two
-credentials apart.
+With `MAPLE_URL` set, the server does not publish at all: it asks the route's
+`POST /gate/refresh` to, sending the branch and its own `GITHUB_TOKEN`. The
+route checks that token can push, decides the verdict from the store and
+publishes with the gate App's installation auth, which it re-mints as each
+token expires. No gate credential ever reaches the agent's machine;
+`docs/github-auth.md` says why that is the line.
 
-It is read once, as a static string, and an installation token expires an hour
-after it is minted. A session that outlives it keeps recording resolves while
-every gate update fails, and `maple-mcp` configures no logger to say so. Mint a
-fresh token for each session; the server does not mint its own yet.
+`MAPLE_GATE_TOKEN` is the direct way, kept for CI: the gate App's own
+installation token, never the store's. It is read once, and an installation
+token expires an hour after it is minted, which a job outlives rarely and a
+session often. Setting both fails at startup. With neither, nothing is
+published and the check moves on the next push. Failures go to stderr.
 
 ## What is not here yet
 
