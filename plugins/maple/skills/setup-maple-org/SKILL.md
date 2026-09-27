@@ -26,10 +26,16 @@ Nothing else differs.
 
 Read `docs/github-auth.md` before or after, depending on whether you want the
 reasoning first. This file is the sequence; that file is why the sequence is
-this one.
+this one. Every `docs/` path here is in the Maple repository, at
+<https://github.com/maple-kit/maple/tree/main/docs>.
 
 Throughout, `acme` is your organisation and `acme/web` a repository you want
 reviewable. Substitute your own.
+
+The CLI does the parts of this that can be generated: `npx @maple-kit/cli@0.12.0
+setup app --owner=acme` prints the prefilled registration URL (`--gate` for the
+gate App), `setup verify --client-id=<Iv…>` checks Device Flow, and `setup ci`
+prints the gate workflow. Flags take the `--flag=value` form only.
 
 ## 1. Register the GitHub App
 

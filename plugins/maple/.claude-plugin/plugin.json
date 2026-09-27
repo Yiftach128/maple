@@ -1,0 +1,13 @@
+{
+  "name": "maple",
+  "version": "0.12.0",
+  "description": "Skills to set up Maple and act on its review comments, and the MCP server that reads and resolves them.",
+  "author": {
+    "name": "maple-kit",
+    "url": "https://github.com/maple-kit"
+  },
+  "homepage": "https://github.com/maple-kit/maple",
+  "repository": "https://github.com/maple-kit/maple",
+  "license": "Apache-2.0",
+  "keywords": ["maple", "visual-review", "preview", "mcp", "code-review"]
+}

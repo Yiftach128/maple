@@ -114,6 +114,20 @@ Next.js uses `withMaple` from `@maple-kit/core/next` and a catch-all route at
 has both. The `setup-maple-org` skill walks through the GitHub App a reviewer
 signs in with.
 
+## Use with Claude Code
+
+The Maple plugin bundles the skills that set Maple up and act on its
+comments, and the MCP server that reads and resolves them:
+
+```
+/plugin marketplace add maple-kit/maple
+/plugin install maple@maple-kit
+```
+
+The server reads `GITHUB_TOKEN`, `MAPLE_GITHUB_OWNER` and `MAPLE_GITHUB_REPO`
+from the environment Claude Code starts in. The Stop hook is not bundled yet;
+the `setup-maple-agent-loop` skill adds it by hand.
+
 ## Vendor-agnostic by construction
 
 Maple stores nothing itself. A connector is one file implementing plain

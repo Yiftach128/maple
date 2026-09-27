@@ -9,7 +9,8 @@ Maple's agent half is one MCP server and one Claude Code Stop hook, both in
 `@maple-kit/mcp`. The server lets the agent read and resolve comments; the hook
 stops it calling itself finished while comments are open. This file is the
 wiring. `docs/agent-loop.md` is the design, and the `maple-review` skill is how
-to act on the comments once they arrive.
+to act on the comments once they arrive. Every `docs/` and `packages/` path
+here is in the Maple repository, at <https://github.com/maple-kit/maple>.
 
 Throughout, `acme/web` is the repository and `web-482` the branch under review.
 Substitute your own.
@@ -43,6 +44,12 @@ client, for example with `op run --env-file .env -- claude`, and reference
 them from `.mcp.json` with `${VAR}`.
 
 ## 3. Add the server to `.mcp.json`
+
+**With the Maple Claude Code plugin installed, skip this section.** The plugin
+already runs the server and reads `GITHUB_TOKEN`, `MAPLE_GITHUB_OWNER` and
+`MAPLE_GITHUB_REPO` from the environment Claude Code starts in, so export all
+three there. It does not install the Stop hook yet: add that by hand, as in
+section 4.
 
 ```json
 {
@@ -172,8 +179,10 @@ returned `cursor`; omit `cursor` only on the first call, to drain what is
 already there.
 
 **Server fails to start: `… is not set; Maple's MCP server cannot start
-without it.`** A required variable from section 3 is missing or empty. A
-`${VAR}` in `.mcp.json` expands to nothing when the client's shell lacks it.
+without it.`** A required variable from section 3 is missing or empty. Claude
+Code passes a `${VAR}` with no default through literally when the client's
+shell lacks it, so the server starts with the placeholder as the value and
+fails later against GitHub; `${VAR:-}` expands to empty and fails here instead.
 
 **`resolve_comment` fails with a 403 or 404.** `GITHUB_TOKEN` lacks `Pull
 requests: Read and write`, or cannot see the repository. GitHub answers 404 for

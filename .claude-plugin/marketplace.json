@@ -1,0 +1,15 @@
+{
+  "name": "maple-kit",
+  "description": "Maple: visual review comments on preview deployments, for the agent that acts on them.",
+  "owner": {
+    "name": "maple-kit",
+    "url": "https://github.com/maple-kit"
+  },
+  "plugins": [
+    {
+      "name": "maple",
+      "source": "./plugins/maple",
+      "description": "Skills to set up Maple and act on its review comments, and the MCP server that reads and resolves them."
+    }
+  ]
+}

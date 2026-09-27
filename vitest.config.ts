@@ -36,7 +36,7 @@ export default defineConfig({
         test: {
           name: "node",
           environment: "node",
-          include: ["packages/*/test/**/*.test.ts", "evals/**/*.eval.test.ts"],
+          include: ["packages/*/test/**/*.test.ts", "tools/*/*.test.ts", "evals/**/*.eval.test.ts"],
           exclude: ["**/*.browser.test.ts", "**/*.browser.test.tsx"],
         },
       },

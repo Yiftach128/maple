@@ -24,6 +24,8 @@ jobs:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup
       - run: pnpm lint
+      - name: Every plugin skill is symlinked into .claude/skills
+        run: pnpm check:skill-links
       - name: No new suppressions
         # `--prune-suppressions` rewrites the file when an entry is no longer
         # needed. A diff here means the ratchet moved and was not committed.

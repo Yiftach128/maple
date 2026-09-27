@@ -18,7 +18,8 @@ automatable, it is here because breaking it is expensive to undo.
 | `evals/`          | Eval harness and conventions for every AI path.                    |
 | `examples/`       | A Next and a Vite application Maple mounts into.                   |
 | `tools/`          | Repository-local tooling, including the ESLint plugin.             |
-| `.claude/skills/` | Skills that ship with the repository.                              |
+| `plugins/maple`   | The Claude Code plugin: user-facing skills and the MCP config.     |
+| `.claude/skills/` | Contributor skills, and a symlink to each plugin skill.            |
 
 ## Rules
 
@@ -82,6 +83,13 @@ field declaring what a connector supports; two sources of truth will disagree.
 
 Every connector runs the shared contract suite in
 `packages/core/src/testing/`. Use the `contribute-connector` skill.
+
+### Skills
+
+A skill a Maple user needs lives in `plugins/maple/skills/<name>`, and
+`.claude/skills/<name>` is a relative symlink to it; a contributor-only skill
+lives in `.claude/skills/` alone. `tools/skill-links` enforces the links, in a
+hook and in CI.
 
 ### Logging
 

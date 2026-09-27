@@ -29,6 +29,12 @@ pre-commit:
           && { echo "pnpm-lock.yaml contains a URL. Re-resolve against the public registry."; exit 1; } \
           || true
 
+    - name: skill-links
+      # Plugin skills are canonical; .claude/skills/<name> symlinks to each.
+      # No glob: a staged deletion matches none, and a deleted skill is exactly
+      # what leaves a link dangling. It reads the working tree, in milliseconds.
+      run: node tools/skill-links/check.ts
+
     - name: commit-identity
       # Git falls back to the global identity when a repository sets none, which
       # is how a work address ends up in a history meant to be published. This
