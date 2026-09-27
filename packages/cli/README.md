@@ -20,11 +20,41 @@ npm install -g @maple-kit/cli
 
 ## Commands
 
-| Command                        | What it does                                                         |
-| ------------------------------ | -------------------------------------------------------------------- |
-| `maple mock plan "<sentence>"` | Prints the recipe a preview's route plans for a sentence.            |
-| `maple mock schema <router>`   | Writes an OpenAPI document of a tRPC router's response types.        |
-| `maple connectors`             | Shows each connector kind and the methods it requires or may define. |
+| Command                        | What it does                                                          |
+| ------------------------------ | --------------------------------------------------------------------- |
+| `maple mock plan "<sentence>"` | Prints the recipe a preview's route plans for a sentence.             |
+| `maple mock schema <router>`   | Writes an OpenAPI document of a tRPC router's response types.         |
+| `maple connectors`             | Shows each connector kind and the methods it requires or may define.  |
+| `maple setup app`              | Prints the prefilled GitHub App registration URL and what follows.    |
+| `maple setup verify`           | Checks that a comment App has Device Flow on.                         |
+| `maple setup ci`               | Prints or writes the gate workflow, and the ruleset that requires it. |
+
+### `maple setup`
+
+Registering Maple's GitHub Apps, and gating a merge on the review. The
+permissions each App is registered with are one constant in this package,
+`GITHUB_APP_PERMISSIONS`, so this is where they are read from rather than
+copied.
+
+```sh
+maple setup app --owner=acme            # the comment App: pull_requests=write
+maple setup app --owner=acme --gate     # the gate App: checks=write
+maple setup verify --client-id=<Iv…>     # exits 1 if Device Flow is off
+maple setup ci --require-approval --write
+```
+
+`setup app` prints a URL that opens GitHub's New GitHub App form already filled
+in, then the steps no URL parameter can set: Device Flow, token expiry, the
+logo, the installation and where the Client ID goes. `--personal` registers
+under a personal account instead of an organisation, and `--json` prints the
+URL, permissions and steps as one object.
+
+`setup verify` asks GitHub for a device code the way a reviewer's first sign-in
+will, and prints neither code it receives.
+
+`setup ci` writes `.github/workflows/maple.yml` on `maple-kit/maple-action@v0`,
+refusing to overwrite one that is there, and prints the `gh api` command that
+makes `maple/visual-review` a required check pinned to GitHub Actions.
 
 ### `maple mock plan`
 
