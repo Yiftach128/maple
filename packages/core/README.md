@@ -9,8 +9,11 @@ comments on deployed previews, written for people and read by agents.
 ## Install
 
 ```sh
-npm install @maple-kit/core
+npm install @maple-kit/core @babel/core
 ```
+
+`@babel/core` is an optional peer that only the JSX tagger uses; skip it if you
+never set `tagger: true`.
 
 Most applications also install [`@maple-kit/ui`](../ui) for the overlay a
 reviewer sees. Core is the part that runs on your server and in your build.
@@ -37,12 +40,17 @@ export default defineConfig({
     maple({
       tagger: process.env.MAPLE_PREVIEW === "1",
       route: {
+        // Local development only: every comment is written as this one token.
         store: createCommentStore(githubStore({ owner, repo, token: process.env.GITHUB_TOKEN! })),
       },
     }),
   ],
 });
 ```
+
+A shared token is for trying it locally. A preview other people review builds
+the store per request from each reviewer's own token, with the resolver in
+[`docs/github-auth.md`](https://github.com/maple-kit/maple/blob/main/docs/github-auth.md#configuration).
 
 Next.js wraps its config in `withMaple` from `@maple-kit/core/next` and mounts
 `createMapleHandler` from `@maple-kit/core/route` at

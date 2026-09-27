@@ -22,8 +22,12 @@ moment you picked. Click a row to read a comment with its context badge.
 Everything is answered by the SDK route the Vite plugin mounts on the dev
 server, so nothing reaches a network.
 
-The dev server resolves the workspace packages to their **source**, so an edit
-anywhere in `packages/` hot-reloads here without a rebuild.
+The page resolves the workspace packages to their **source**, so an edit to
+what runs in the browser hot-reloads here without a rebuild. `vite.config.ts`
+is the exception: it runs in Node and imports `@maple-kit/core` and
+`@maple-kit/classifier` from their `dist`, which `predev` builds before the
+server starts. After a change to the plugin, the route or a classifier, stop
+the server and run `dev` again so `predev` rebuilds it.
 
 Two more things worth knowing: `?maple=off` turns the overlay off without a
 rebuild, and the store is in memory, so restarting the server puts the three
@@ -51,7 +55,7 @@ pnpm --filter @maple-kit/example-vite verify
 4. **A build, not a dev server.** Maple's premise is comments on deployed
    previews, so the assertions run against `vite build` output.
 5. **The overlay mounts, from one element.** `<Maple branch="…" />` from
-   `@maple-kit/ui/maple` in `App.tsx` is the whole call site: the marks, the
+   `@maple-kit/ui/maple` in `main.tsx` is the whole call site: the marks, the
    picker, the island and the composer, over one shadow root. An application
    replacing a part imports the parts instead, which is what that entry is
    assembled from.

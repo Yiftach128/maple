@@ -104,7 +104,11 @@ looked over and liked: both are green, both for the reason "no comments". The
 gate is honest about comments and says nothing at all about whether anybody
 looked, because until an approval exists there is nothing for it to say.
 
-`requireApproval` is the opt-in that changes it.
+`requireApproval` is the opt-in that changes it. It is off unless three things
+are set, and they have to agree: the action's `require-approval: "true"`,
+`RouteOptions.requireApproval` (or `MAPLE_REQUIRE_APPROVAL` for the MCP
+server), and an identity connector on the route. Setting one alone either does
+nothing or lets a push clear a gate a reviewer is holding.
 
 ```ts
 const verdict = decideGate(comments, {
@@ -198,8 +202,9 @@ nobody rediscovers it by breaking it.
   has no preview and nobody to comment on it, and its head commit is in the
   event payload rather than in `GITHUB_HEAD_REF`, which it does not have. This
   exact hang is what sank Chromatic.
-- **Pin `integration_id` in the ruleset**, or anyone with push access can forge
-  a green status under the same check name.
+- **Pin the check's source in the ruleset**, or anyone with push access can
+  forge a green status under the same check name. Which App to pin depends on
+  who publishes; see [which App to pin](#which-app-to-pin).
 
 ## Publishing from the route
 
@@ -291,3 +296,25 @@ The alternative was to give the action the App's private key so that both
 halves publish as the same App. That is worse: it puts a signing key in CI for
 a job whose own `GITHUB_TOKEN` is already sufficient at push time, and the key
 is the one credential `docs/github-auth.md` argues hardest about.
+
+### Which App to pin
+
+A ruleset's required check can name the App it must come from — the
+`integration_id`, shown as the check's source. A run from any other App does
+not satisfy it.
+
+| Who publishes     | Pin                     | Why                                                                                  |
+| ----------------- | ----------------------- | ------------------------------------------------------------------------------------ |
+| The action only   | GitHub Actions, `15368` | Every run comes from `github.token`.                                                 |
+| The gate App only | The gate App's own id   | The route and the MCP server both publish with its installation token.               |
+| Both              | See below               | Each pin ignores the other publisher's runs, so it undoes half of what both are for. |
+
+With both publishers, pinning `15368` means a reviewer's resolve publishes a
+green run the ruleset does not count; the merge waits for the next workflow
+run, which is the one-way gate the route exists to fix. Pinning the gate App
+means a push has no run from it until someone changes a status, so the check
+is missing rather than pending. The two ways out are to leave the source
+unpinned and accept that push access can forge the check, or to have the
+action publish as the gate App — its `token` and `app-id` inputs take the
+App's installation token and id — at the cost of the App's key in CI, argued
+against above. Choose one knowingly; neither is free.

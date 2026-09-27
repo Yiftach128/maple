@@ -1,8 +1,9 @@
 # Configuration
 
 Every environment variable a host sets to run Maple, in one place, with which
-of them are secrets. Maple reads none of these itself: the SDK route takes
-options, and a host reads its own environment and passes them in. This file
+of them are secrets. The SDK reads none of these itself: the route takes
+options, and a host reads its own environment and passes them in. The MCP
+server is the exception, below. This file
 names them so that two deployments do not invent two vocabularies.
 
 **Maple's own knobs carry `MAPLE_`. A provider's credential keeps the
@@ -47,8 +48,10 @@ App registered at all. These three variables buy the other half: a resolve
 clearing the check live, rather than a reviewer waiting for a commit nobody
 needs to make.
 
-**`requireApproval` is a route option, not a variable**, and when it is on the
-action needs `require-approval: "true"` to match. The two publish the same
+**On the route, `requireApproval` is an option, not a variable** (the MCP
+server's `MAPLE_REQUIRE_APPROVAL`, below, is the one place it is read from the
+environment). It is off by default, and when it is on the action needs
+`require-approval: "true"` to match. The two publish the same
 check name, so a disagreement lets a push clear a gate a reviewer is holding.
 It also needs an identity connector, or anyone with the preview URL can clear a
 required check as "Guest".
@@ -81,15 +84,26 @@ measure against.
 The MCP server is the one place Maple reads its own environment, because it is
 a process rather than a library. `docs/agent-loop.md` covers it.
 
-| Name                 | Secret | What it is                                   |
-| -------------------- | ------ | -------------------------------------------- |
-| `MAPLE_GITHUB_TOKEN` | Yes    | A token that can read and write PR comments. |
-| `MAPLE_GITHUB_OWNER` | No     | The repository's owner.                      |
-| `MAPLE_GITHUB_REPO`  | No     | The repository.                              |
-| `MAPLE_GITHUB_API`   | No     | For Enterprise Server.                       |
+| Name                     | Secret | What it is                                                                  |
+| ------------------------ | ------ | --------------------------------------------------------------------------- |
+| `GITHUB_TOKEN`           | Yes    | A token that can read and write pull-request comments. Required.            |
+| `MAPLE_GITHUB_OWNER`     | No     | The repository's owner. Required.                                           |
+| `MAPLE_GITHUB_REPO`      | No     | The repository. Required.                                                   |
+| `MAPLE_GITHUB_API`       | No     | The API root, for Enterprise Server.                                        |
+| `MAPLE_STORE`            | No     | `github`, the default and so far the only one.                              |
+| `MAPLE_BRANCH`           | No     | The branch under review. Required by the Stop hook; the server ignores it.  |
+| `MAPLE_GATE_TOKEN`       | Yes    | The gate App's installation token. Absent, a resolve publishes no verdict.  |
+| `MAPLE_GATE_APP_ID`      | No     | The gate App's id, so it updates its own check run rather than another's.   |
+| `MAPLE_REQUIRE_APPROVAL` | No     | `true` to hold the gate until somebody approves, matching the route and CI. |
 
 This token is an agent's, not a reviewer's, and it belongs on a developer's
 machine or in CI — never in a preview environment.
+
+`MAPLE_GATE_TOKEN` is read once, as a static string, and an installation token
+expires an hour after it is minted. A server that outlives it publishes with a
+dead token: the resolve is still recorded, and the gate update fails with
+nothing logged, because `maple-mcp` configures no logger. Mint a fresh token
+for each session until the server can mint its own.
 
 ## Where each one goes
 

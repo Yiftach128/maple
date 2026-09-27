@@ -59,8 +59,11 @@ this. None combines all four of:
 ## Add it to an app
 
 ```sh
-npm install @maple-kit/core @maple-kit/ui
+npm install @maple-kit/core @maple-kit/ui @babel/core
 ```
+
+`@babel/core` is an optional peer, and the tagger is what needs it: leave it out
+and `tagger: true` has nothing to transform with.
 
 Mount the route and the tagger from the build, then render the overlay:
 
@@ -78,6 +81,7 @@ export default defineConfig({
     maple({
       tagger: preview,
       route: {
+        // Local development only: every comment is written as this one token.
         store: createCommentStore(
           githubStore({ owner: "acme", repo: "web", token: process.env.GITHUB_TOKEN! }),
         ),
@@ -98,6 +102,12 @@ createRoot(root).render(
   </>,
 );
 ```
+
+The shared `GITHUB_TOKEN` is for trying Maple on your own machine. A preview
+other people review builds the store per request from each reviewer's own
+token — the resolver in
+[`docs/github-auth.md`](docs/github-auth.md#configuration) — so a comment is
+authored by whoever wrote it and no GitHub secret sits in the preview.
 
 Next.js uses `withMaple` from `@maple-kit/core/next` and a catch-all route at
 `app/api/maple/[...maple]/route.ts`; [`examples/next-app`](examples/next-app)

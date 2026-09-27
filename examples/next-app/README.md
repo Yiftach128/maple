@@ -74,13 +74,14 @@ it on in the server-rendered HTML. A production build reads no request, keeps
 
 ## What it does not prove yet
 
-1. **Mounting under a strict CSP.** The application should set
-   `script-src 'nonce-…' 'strict-dynamic'` and Maple should mount anyway.
-   `'strict-dynamic'` discards `'self'`, so `<Maple />` has to arrive as part of
-   the application's own module graph. The overlay's components do not exist
-   yet; see `docs/overlay-csp.md`.
-2. **The codemod route.** `app/api/maple/[...maple]/route.ts`, written by a
-   codemod and checked in here so its output is reviewed as code.
+1. **The overlay, under a strict CSP.** `@maple-kit/ui` ships `<Maple />`, but
+   this page mounts only `<MapleMock />` and sets no policy. The application
+   should set `script-src 'nonce-…' 'strict-dynamic'` and `<Maple />` should
+   mount anyway: `'strict-dynamic'` discards `'self'`, so it has to arrive as
+   part of the application's own module graph. See `docs/overlay-csp.md`.
+2. **A route with a store.** `app/api/maple/[...maple]/route.ts` is written by
+   hand for Maple Mock and mounts no store, so the comment endpoints answer
+   `404` here.
 3. **Server-side identity.** A `resolveUser(request)` reading the application's
    own session cookie and stamping `provenance: "server"`.
 

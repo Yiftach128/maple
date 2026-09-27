@@ -1,6 +1,6 @@
 ---
 name: contribute-connector
-description: Scaffold a Maple connector from a template, run the shared contract suite against it, and emit its row for the capability matrix. Use when adding support for a new backend (a store, media, observability or identity provider) or when an existing connector's tests need wiring.
+description: Scaffold a Maple connector from a template, run the shared contract suite against it, and emit its row for the capability matrix. Use when adding support for a new backend (a store, media, observability, identity, gate or classifier provider) or when an existing connector's tests need wiring.
 ---
 
 # Contribute a connector
@@ -14,8 +14,9 @@ row so the matrix in `docs/connectors.md` cannot drift from the code.
 Answer these four. Guessing here is what produces a connector that passes tests
 and fails in a preview.
 
-1. **Which kind?** `store`, `media`, `observability` or `identity`. A backend
-   can be more than one; write one file per kind it fills.
+1. **Which kind?** `store`, `media`, `observability`, `identity`, `gate` or
+   `classifier` — the six in `ConnectorKind`. A backend can be more than one;
+   write one file per kind it fills.
 2. **Which optional methods can the backend honestly support?** Omit the rest.
    An optional method that throws is worse than an absent one, because Maple
    degrades around absence and cannot degrade around a throw.
@@ -37,9 +38,11 @@ before starting.
    `packages/core/src/testing/memory-store.ts` as the smallest thing that
    satisfies it.
 
-2. **Copy the template.** From `templates/store.ts.template` for a store
-   connector. Put it at `packages/core/src/connectors/<name>.ts`. The connector
-   `name` is lowercase, hyphenated, and matches the filename.
+2. **Copy the template.** Only a store has one: `templates/store.ts.template`.
+   For any other kind, start from its interface in `types.ts` and the memory
+   reference beside the contract (`memory-gate.ts`, `memory-classifier.ts`,
+   `memory-media.ts`). Put it at `packages/core/src/connectors/<name>.ts`. The
+   connector `name` is lowercase, hyphenated, and matches the filename.
 
 3. **Implement.** Rules the contract enforces, so knowing them up front is
    cheaper than discovering them in a failure:
@@ -69,6 +72,10 @@ before starting.
 
    `create` is called once per test and must hand back an isolated backend. A
    shared one leaks state between tests and turns a real failure into a flake.
+
+   A gate runs `runGateContract` and a classifier `runClassifierContract`, both
+   from the same directory and wired the same way. Media, observability and
+   identity have no contract suite yet; test those against msw directly.
 
 5. **Mock every network call.** Handlers go in `packages/core/test/msw/`, one
    file per upstream. A connector tested only against a 200 is not tested

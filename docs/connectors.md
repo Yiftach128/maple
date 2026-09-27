@@ -149,7 +149,6 @@ below the table.
 | `github` (gate)      | —    | —      | —         | —    | —     | —         | —       | —         | —       | —      | —             | —           | —           | ✓       | ✓    | —     | —        | —    |
 | `memory` (reference) | ✓    | ✓      | ✓         | ✓    | —     | ✓         | ✓       | ✓         | —       | —      | —             | —           | —           | ✓       | ✓    | ✓     | ✓        | ✓    |
 | `keyword` (baseline) | —    | —      | —         | —    | —     | —         | —       | —         | —       | —      | —             | —           | —           | —       | —    | ✓     | ✓        | ✓    |
-| `datadog`            | ~    | ✓      | ~         | —    | —     | —         | —       | —         | —       | —      | ~             | ✓           | ~           | —       | —    | —     | —        | —    |
 
 The reference connector lives in `@maple-kit/core/testing` and exists so the
 contract suite has something to run against. It is not for production.
@@ -267,11 +266,15 @@ and the pull request is opened after that, so a miss has to be re-asked.
 - Rate limits surface as the error GitHub sent, message intact, so core can
   decide what to retry.
 
-## Datadog
+## Datadog (planned)
 
-Datadog is a strong observability connector and a lossy store. Both are worth
-having, and the limits below are the reason the capability matrix has three `~`
-marks rather than three `✓`.
+**No Datadog connector exists yet**, which is why it has no row in the matrix.
+This section is the assessment it will be built against, kept so the losses
+are known before anyone writes it.
+
+Datadog would be a strong observability connector and a lossy store. Both are
+worth having, and the limits below are why its row will carry `~` marks for
+`list`, `setStatus`, `getReplayLink` and `resolveUser` rather than `✓`.
 
 ### As a store — usable, with real losses
 

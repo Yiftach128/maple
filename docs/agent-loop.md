@@ -5,12 +5,12 @@ the overlay. Neither knows about the other; they meet in the store.
 
 ## The four tools
 
-| Tool                  | Reads | What it is for                                                                                 |
-| --------------------- | ----- | ---------------------------------------------------------------------------------------------- |
-| `list_comments`       | ✓     | Everything on a branch, newest first.                                                          |
-| `wait_for_comments`   | ✓     | Block until something new arrives.                                                             |
-| `get_comment_context` | ✓     | Everything needed to act on one comment, and the mock it was written under with a replay link. |
-| `resolve_comment`     |       | Mark one addressed, naming the commit.                                                         |
+| Tool                                             | Reads | What it is for                                                                                 |
+| ------------------------------------------------ | ----- | ---------------------------------------------------------------------------------------------- |
+| `list_comments(branch, statuses?)`               | ✓     | Everything on a branch in every status, newest first; `statuses` narrows it.                   |
+| `wait_for_comments(branch, cursor?, timeoutMs?)` | ✓     | Block until something new arrives.                                                             |
+| `get_comment_context(id, branch)`                | ✓     | Everything needed to act on one comment, and the mock it was written under with a replay link. |
+| `resolve_comment(id, sha, note?)`                |       | Mark one addressed, naming the commit.                                                         |
 
 ### A timeout is a result
 
@@ -48,6 +48,11 @@ session, and the person watching an agent loop has no way out of one. On the
 ninth it lets the session end and says what is still open, which is a better
 outcome than an agent resolving comments to escape.
 
+The hook reads its own environment, not the MCP server's: an `env` block in
+`.mcp.json` reaches the server and nothing else. `MAPLE_GITHUB_OWNER`,
+`MAPLE_GITHUB_REPO`, `GITHUB_TOKEN` and `MAPLE_BRANCH` have to be set where the
+client starts, or the hook fails at startup naming the one that is missing.
+
 ## Configuration
 
 The client starts an MCP server with no arguments, so the environment is the
@@ -82,6 +87,11 @@ Without `MAPLE_GATE_TOKEN` nothing is published and the behaviour is what it
 was. The token is the gate App's own and never the store's, because the store's
 is a reviewer's — `docs/github-auth.md` is the argument for keeping the two
 credentials apart.
+
+It is read once, as a static string, and an installation token expires an hour
+after it is minted. A session that outlives it keeps recording resolves while
+every gate update fails, and `maple-mcp` configures no logger to say so. Mint a
+fresh token for each session; the server does not mint its own yet.
 
 ## What is not here yet
 

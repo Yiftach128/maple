@@ -9,14 +9,14 @@ application pointed at real data.
 This file is how a reviewer's comment reaches GitHub without a GitHub secret
 ever existing in that environment.
 
-The short version: one GitHub App, OAuth Device Flow, one user-to-server token
+The short version: the comment App, OAuth Device Flow, one user-to-server token
 per reviewer, held in an `HttpOnly` cookie on the preview's own origin. The
 preview holds no GitHub secret at all. It holds the App's `client_id`, which is
 public by design.
 
 ## The flow
 
-1. An organisation owner installs the Maple GitHub App on the repositories that
+1. An organisation owner installs Maple's comment App on the repositories that
    should be reviewable. One-time, by a person with owner rights. The runbook is
    the `setup-maple-org` skill.
 2. A reviewer opens a preview and clicks **Link GitHub** in the overlay.
@@ -200,13 +200,16 @@ or to any third party. The token leaves the server only in requests the route
 itself makes to `api.github.com`. The overlay never sees it; there is no code
 path that returns it to the browser.
 
-If `basePath` is changed from its default, the cookie path follows it. The two
-are read from the same option so they cannot drift apart.
+The cookie path is `githubAuth.path`, defaulting to `/api/maple`. It does not
+follow `basePath`: a route mounted somewhere else must set `githubAuth.path` to
+the same value, or the browser never sends the cookie to it and every reviewer
+reads as unlinked.
 
 ### Encryption at rest is optional, and narrow
 
-The route takes an optional `cookieKey` and encrypts the cookie value with
-AES-GCM. Be clear about what that buys.
+`githubAuth.key` is optional, and when set the route encrypts the cookie value
+with AES-GCM. A store resolver reading the cookie passes the same key to
+`readGitHubSession(request, { key })`. Be clear about what that buys.
 
 It protects the token from something that can read the cookie jar but not the
 server's configuration: a backup of a request log, a proxy that stores response

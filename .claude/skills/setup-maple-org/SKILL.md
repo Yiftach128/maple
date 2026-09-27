@@ -242,7 +242,13 @@ Maple can score a comment against five pillars as the reviewer types it. It is
 advice and never a gate — it cannot block a send or reach the check run — and
 the whole tier is off unless a classifier is configured.
 
-Turning it on is one option and one secret:
+Turning it on is one package, one option and one secret. The classifier
+package takes Effect 4 and the TypeSafe provider as peers, both still release
+candidates, so install them with it:
+
+```sh
+npm install @maple-kit/classifier effect@rc @effect/ai-typesafe@rc
+```
 
 ```ts
 import { jevClassifier } from "@maple-kit/classifier";
@@ -302,24 +308,50 @@ The comment App above is half of Maple. The merge gate publishes a
 authenticates **as itself** with an installation token rather than as any
 reviewer.
 
-**Run the gate in CI first.** `maple-action` publishes `maple/visual-review` on
-the workflow's own `GITHUB_TOKEN` with `checks: write`, so the merge is gated
-with no App registered and nobody's rights needed:
+**Run the gate in CI first, and register this App only if you want more.**
+`maple-action` publishes `maple/visual-review` on the workflow's own
+`GITHUB_TOKEN`, so the merge is gated with no App registered and nobody's
+rights needed. This is the action's own workflow, permissions included: without
+`checks: write` the gate cannot publish, and without read access to pull
+requests it concludes `unreadable` and never blocks.
 
 ```yaml
-- uses: maple-kit/maple-action@v0
-  with:
-    mode: sync
-- uses: maple-kit/maple-action@v0
-  with:
-    mode: gate
-    require-approval: "true"
+name: Maple
+on: pull_request
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write # gate: the check run it reports
+      pull-requests: write # sync writes the comment; gate reads them
+    steps:
+      - uses: maple-kit/maple-action@v0
+        with:
+          mode: sync
+      - uses: maple-kit/maple-action@v0
+        with:
+          mode: gate
 ```
 
-`require-approval` has to match `RouteOptions.requireApproval`, because the
-action and the route publish the same check name and a disagreement means a
-push clears a gate a reviewer is holding. It also needs an identity connector,
-or anyone with the preview URL clears a required check as "Guest".
+`@v0` follows every `v0.x.y` release; pin a full tag such as `@v0.3.0` to hold
+one exactly.
+
+**Requiring an approval is opt-in, in three places that must agree.** Add
+`require-approval: "true"` to the `gate` step, set
+`RouteOptions.requireApproval` on the route, and give the route an identity
+connector. The action and the route publish the same check name, so if only
+one of them requires an approval, a push clears a gate a reviewer is holding.
+Without identity, anyone with the preview URL clears a required check as
+"Guest".
+
+What the second App adds is the other direction: a reviewer resolving the last
+comment clears the check there and then, instead of waiting for a commit nobody
+needs to make. Worth having, and worth having second.
 
 Register the second App separately, when you come to wire the gate and not before. It is a
 second **New GitHub App** with `Checks: Read and write`, Device Flow **off**,
@@ -330,17 +362,36 @@ from section 1a: the gate App's avatar is what sits beside
 `maple/visual-review` in the checks list on every pull request, at about
 twenty pixels, which is the size the mark was drawn to survive. `docs/gate.md` covers the rest.
 
-It configures the route through `MAPLE_GATE_APP_ID`,
-`MAPLE_GATE_INSTALLATION_ID` and `MAPLE_GATE_PRIVATE_KEY` — the last a real
-secret, unlike anything the comment App needs.
+The route reads no environment of its own. The host reads the App's three
+values — `MAPLE_GATE_APP_ID`, `MAPLE_GATE_INSTALLATION_ID` and
+`MAPLE_GATE_PRIVATE_KEY`, the last a real secret, unlike anything the comment
+App needs — and passes a gate in:
 
-**Run the gate in CI first, and register this App only if you want more.**
-`maple-action` publishes `maple/visual-review` on the workflow's own
-`GITHUB_TOKEN` with `checks: write`, so the merge is gated with no App
-registered and nobody's rights needed. What the second App adds is the other
-direction: a reviewer resolving the last comment clears the check there and
-then, instead of waiting for a commit nobody needs to make. Worth having, and
-worth having second.
+```ts
+import { createInstallationAuth } from "@maple-kit/core/auth";
+import { githubGate } from "@maple-kit/core/connectors";
+
+// One per process: it caches the hour-long installation token and re-mints it.
+const installation = createInstallationAuth({
+  appId: process.env.MAPLE_GATE_APP_ID!,
+  installationId: process.env.MAPLE_GATE_INSTALLATION_ID!,
+  privateKey: process.env.MAPLE_GATE_PRIVATE_KEY!,
+});
+
+// …on the same createMapleHandler call:
+gate: async () =>
+  githubGate({
+    owner: "acme",
+    repo: "web",
+    token: await installation.token(),
+    appId: process.env.MAPLE_GATE_APP_ID!,
+  }),
+```
+
+`gate` is a resolver so the token is asked for on every request; a connector
+built once would hold a token that expired an hour later. `appId` is what lets
+it find its own check run beside the one GitHub Actions created, and
+`docs/gate.md` says which of the two a ruleset should pin.
 
 The reason the permissions cannot simply be added to the App you just made is
 the one sentence this whole design rests on: **a user-to-server token carries
