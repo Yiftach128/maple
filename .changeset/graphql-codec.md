@@ -3,7 +3,8 @@
 "@maple-kit/core": minor
 ---
 
-A GraphQL codec, on by default at `/graphql`. An operation is a call named
+A GraphQL codec, on by default at `/graphql` and `/api/graphql`, and
+anywhere else `graphqlCodec({ endpoint })` names. An operation is a call named
 `graphql:GetProjects`; an anonymous one is keyed by a hash of its text, and a
 persisted one by its id or, with `graphqlCodec({ manifest })`, by its
 operation. A body state reshapes the `data` the page's own operation fetched,

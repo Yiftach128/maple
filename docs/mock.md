@@ -258,12 +258,14 @@ in which case it is named like any other. `readGraphqlOperation` in
 `@maple-kit/core/mock` computes the key, since the route will name the same
 operations when it serves their shapes.
 
-It claims `POST` and `GET` at one endpoint, `/graphql` unless
-`graphqlCodec({ endpoint })` says otherwise, and reads `operationName`,
-`query`, `documentId` and `extensions` from the JSON body or the query string.
-A batch, one array of operations, is not claimed and goes through as it came,
-as does a request that names no operation. Multipart uploads and
-subscriptions over a websocket never reach it.
+It owns every request at its endpoints, `/graphql` and `/api/graphql` unless
+`graphqlCodec({ endpoint })` names others, and reads `operationName`, `query`,
+`documentId` and `extensions` from a `POST`'s JSON body or a `GET`'s query
+string. A request there that it cannot name, a batch of operations, a
+multipart upload, a body that is not JSON or one naming no operation, has no
+call in it: it goes through as it came, and never reaches the REST codec, so
+no state applies to it and no write is reported for it. Subscriptions over a
+websocket never reach the interceptor.
 
 **The page's own operation runs on the server.** A body state reshapes the
 `data` the server answered, which matches the selection set exactly, so the

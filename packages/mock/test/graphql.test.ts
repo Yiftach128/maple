@@ -1,4 +1,4 @@
-import { createInventory, graphqlCodec, resolve, restCodec } from "@maple-kit/mock";
+import { createInventory, graphqlCodec, resolve, restCodec, trpcCodec } from "@maple-kit/mock";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import {
@@ -119,16 +119,26 @@ describe("graphqlCodec.split", () => {
     await expect(named.split(post({ documentId: "m2" }))).resolves.toEqual([{ key: "graphql:m2" }]);
   });
 
-  it("finds the handler where it is mounted", async () => {
-    const mounted = graphqlCodec({ endpoint: "/api/graphql/" });
-    const at = (path: string) => post({ query: QUERIES.me }, {}, `${ORIGIN}${path}`);
-    await expect(mounted.split(at("/api/graphql"))).resolves.toHaveLength(1);
-    await expect(mounted.split(at("/graphql"))).resolves.toBeUndefined();
+  it.each([
+    [undefined, "/graphql", true],
+    [undefined, "/api/graphql", true],
+    ["/v1/gql/", "/v1/gql", true],
+    ["/v1/gql", "/graphql", false],
+    [["/graphql", "/v1/gql"], "/v1/gql", true],
+  ] as const)("mounted at %j, finds a request to %s: %s", async (endpoint, path, found) => {
+    const mounted = graphqlCodec(endpoint === undefined ? {} : { endpoint });
+    const calls = await mounted.split(post({ query: QUERIES.me }, {}, `${ORIGIN}${path}`));
+    expect(calls !== undefined).toBe(found);
   });
 
   it.each([
     ["another path", post({ query: QUERIES.me }, {}, `${ORIGIN}/api/projects`)],
     ["a path under the endpoint", post({ query: QUERIES.me }, {}, `${GRAPHQL}/schema`)],
+  ])("does not claim %s", async (_, request) => {
+    await expect(codec.split(request)).resolves.toBeUndefined();
+  });
+
+  it.each([
     ["a batch", post([{ query: QUERIES.me }, { query: QUERIES.projects }])],
     [
       "a body that is not JSON",
@@ -146,8 +156,8 @@ describe("graphqlCodec.split", () => {
     ["a GET that names nothing", new Request(GRAPHQL)],
     ["a body that names nothing", post({ variables: {} })],
     ["extensions that are not an object", get({ extensions: "[]" })],
-  ])("does not claim %s", async (_, request) => {
-    await expect(codec.split(request)).resolves.toBeUndefined();
+  ])("owns %s at its endpoint, with no call in it", async (_, request) => {
+    await expect(codec.split(request)).resolves.toEqual([]);
   });
 });
 
@@ -319,6 +329,30 @@ describe("graphqlCodec against a GraphQL server", () => {
     const response = await run(request, recipe("graphql:Projects", "empty"), inventory);
     await expect(response?.json()).resolves.toEqual({ data: EMPTY });
     expect(fake.reached).toEqual(["POST projects", "POST projects"]);
+  });
+
+  it.each([
+    ["a batch", post([{ query: QUERIES.me }, { query: QUERIES.projects }])],
+    [
+      "a body that is not JSON",
+      new Request(GRAPHQL, { method: "POST", headers: JSON_TYPE, body: "{" }),
+    ],
+  ])("passes %s through untouched, never as a REST call", async (_, request) => {
+    const writes: string[] = [];
+    const active: Recipe = {
+      version: 2,
+      calls: [{ key: "rest:POST /graphql", state: "empty" }],
+      as: { role: "barista" },
+    };
+    const response = await resolve(request, active, createInventory(), {
+      ...options,
+      codecs: [trpcCodec(), graphqlCodec(), restCodec],
+      identity: RULES,
+      onWrite: (key) => writes.push(key),
+    });
+    expect(response).toBeUndefined();
+    expect(writes).toEqual([]);
+    expect(fake.reached).toEqual([]);
   });
 
   it.each([
