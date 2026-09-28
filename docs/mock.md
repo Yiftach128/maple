@@ -128,6 +128,12 @@ that are not the page's data, such as Maple's own route.
   carries none of it.
 - **With no recipe it changes nothing.** Every request goes through untouched,
   and its answer is recorded.
+- **It says why a named call was not mocked**, at `debug` on its logger: a
+  request its codec could name no call in, a response it could not read, or
+  a body state with no data, sample or shape to reshape, which keeps the
+  server's answer. Not louder: a persisted query's first request is one of
+  those on every fresh tab, and a warning there would be noise in the host's
+  monitoring.
 
 ## The MSW transport
 

@@ -29,6 +29,7 @@ import { createWriteLog } from "./writes.js";
 import type { Codec } from "./codec.js";
 import type { Flags, FlagSource } from "./flag-source.js";
 import type { Inventory } from "./inventory.js";
+import type { Unmocked } from "./resolve.js";
 import type { PlanLookup } from "./schema/plan.js";
 import type { ShapeLookup } from "./schema/shape.js";
 import type { WriteLog } from "./writes.js";
@@ -80,6 +81,12 @@ export interface MockHandle {
 }
 
 const CODECS: readonly Codec[] = [trpcCodec(), graphqlCodec(), restCodec];
+
+const UNMOCKED: Readonly<Record<Unmocked["reason"], string>> = {
+  "no call": "A request went through unmocked: its codec could name no call in it.",
+  unreadable: "A call went through unmocked: its codec could not read the response.",
+  "nothing to reshape": "A call kept the server's answer: its state had nothing to reshape.",
+};
 
 /**
  * Wraps `fetch` and `XMLHttpRequest` and applies the active recipe. A second
@@ -136,6 +143,7 @@ export function installMock(options: InstallOptions = {}): MockHandle {
         forward,
         route: route(),
         onWrite,
+        onUnmocked: (unmocked) => logUnmocked(options.logger, request, unmocked),
         ...(shape === undefined ? {} : { shape }),
         ...(applied === undefined ? {} : { identity: applied }),
       });
@@ -183,6 +191,14 @@ export function installMock(options: InstallOptions = {}): MockHandle {
   };
   keepInstalled(handle);
   return handle;
+}
+
+/**
+ * At `debug`: a persisted query's first request keeps the server's answer on
+ * every page load, so a louder level would be noise in the host's monitoring.
+ */
+function logUnmocked(logger: Logger | undefined, request: Request, unmocked: Unmocked): void {
+  logger?.debug(UNMOCKED[unmocked.reason], { ...unmocked, path: new URL(request.url).pathname });
 }
 
 /**

@@ -39,7 +39,7 @@ export type { Inventory, InventoryLimits, InventoryOptions, Sample } from "./inv
 export { forgetRecipe, RECIPE_STORAGE_KEY, readRecipe, saveRecipe } from "./link.js";
 export type { RecipeSources } from "./link.js";
 export { resolve } from "./resolve.js";
-export type { ResolveOptions } from "./resolve.js";
+export type { ResolveOptions, Unmocked } from "./resolve.js";
 export { isJson, pathPattern, restCodec, restKey } from "./rest.js";
 export { routeIdentity } from "./schema/identity.js";
 export type { RouteIdentityOptions } from "./schema/identity.js";

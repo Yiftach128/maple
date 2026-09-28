@@ -16,7 +16,7 @@ import { RULES } from "./msw/identity.js";
 import { createTestServer, useTestServer } from "./msw/server.js";
 
 import type { MockState, Recipe } from "@maple-kit/core/mock";
-import type { Answer, Inventory } from "@maple-kit/mock";
+import type { Answer, Inventory, Unmocked } from "@maple-kit/mock";
 
 const fake = createGraphqlFake();
 const server = createTestServer(...fake.handlers);
@@ -337,8 +337,9 @@ describe("graphqlCodec against a GraphQL server", () => {
       "a body that is not JSON",
       new Request(GRAPHQL, { method: "POST", headers: JSON_TYPE, body: "{" }),
     ],
-  ])("passes %s through untouched, never as a REST call", async (_, request) => {
+  ])("passes %s through untouched, never as a REST call, and says so", async (_, request) => {
     const writes: string[] = [];
+    const unmocked: Unmocked[] = [];
     const active: Recipe = {
       version: 2,
       calls: [{ key: "rest:POST /graphql", state: "empty" }],
@@ -349,10 +350,21 @@ describe("graphqlCodec against a GraphQL server", () => {
       codecs: [trpcCodec(), graphqlCodec(), restCodec],
       identity: RULES,
       onWrite: (key) => writes.push(key),
+      onUnmocked: (note) => unmocked.push(note),
     });
     expect(response).toBeUndefined();
     expect(writes).toEqual([]);
+    expect(unmocked).toEqual([{ codec: "graphql", reason: "no call" }]);
     expect(fake.reached).toEqual([]);
+  });
+
+  it("says nothing of a request it cannot name when no recipe applies", async () => {
+    const unmocked: Unmocked[] = [];
+    await resolve(post([{ query: QUERIES.me }]), undefined, createInventory(), {
+      ...options,
+      onUnmocked: (note) => unmocked.push(note),
+    });
+    expect(unmocked).toEqual([]);
   });
 
   it.each([
@@ -377,14 +389,19 @@ describe("graphqlCodec against a GraphQL server", () => {
 
     it("lets the miss through so the page retries, then reshapes the retry", async () => {
       const inventory = createInventory();
+      const unmocked: Unmocked[] = [];
+      const told = { ...options, onUnmocked: (note: Unmocked) => unmocked.push(note) };
       const active = recipe("graphql:Projects", "empty");
-      const first = await run(miss(), active, inventory);
+      const first = await resolve(miss(), active, inventory, told);
       expect(first?.status).toBe(200);
       await expect(first?.json()).resolves.toEqual(NOT_FOUND);
       expect(inventory.sample("graphql:Projects", "/p")).toBeUndefined();
-      const second = await run(retry(), active, inventory);
+      const second = await resolve(retry(), active, inventory, told);
       await expect(second?.json()).resolves.toEqual({ data: EMPTY });
       expect(fake.reached).toEqual([`POST #${PROJECTS_HASH}`, "POST projects"]);
+      expect(unmocked).toEqual([
+        { codec: "graphql", key: "graphql:Projects", reason: "nothing to reshape", status: 200 },
+      ]);
     });
 
     it("answers a miss from the recorded sample, and the page never retries", async () => {

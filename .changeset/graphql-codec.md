@@ -14,4 +14,6 @@ APQ still works under a mock. `readGraphqlOperation` in `@maple-kit/core/mock`
 computes the key.
 
 A `Call` may say whether it `mutates`, and a write reaching the server under
-`as` is reported by that rather than by the method when it does.
+`as` is reported by that rather than by the method when it does. The
+interceptor says at `debug` why a call the recipe names went through
+unmocked, through `ResolveOptions.onUnmocked`.

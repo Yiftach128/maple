@@ -9,7 +9,7 @@ import { RULES } from "./msw/identity.js";
 import { createTestServer, useTestServer } from "./msw/server.js";
 
 import type { MockState, Recipe } from "@maple-kit/core/mock";
-import type { Codec, Inventory } from "@maple-kit/mock";
+import type { Codec, Inventory, Unmocked } from "@maple-kit/mock";
 
 const api = createApiFake();
 const server = createTestServer(...api.handlers);
@@ -250,6 +250,39 @@ describe("resolve", () => {
   it("returns a response it cannot read untouched", async () => {
     const response = await run("/page", recipe("rest:GET /api/page", "empty"));
     await expect(response?.text()).resolves.toBe("<p>hi</p>");
+  });
+
+  it.each<[string, string, () => void, Pick<Unmocked, "reason" | "status">]>([
+    ["a response it cannot read", "/page", () => undefined, { reason: "unreadable", status: 200 }],
+    [
+      "a failure it has nothing to reshape",
+      "/projects",
+      () => api.fail("/api/projects"),
+      { reason: "nothing to reshape", status: 500 },
+    ],
+  ])("says why a named call kept the server's answer: %s", async (_, path, before, told) => {
+    before();
+    const unmocked: Unmocked[] = [];
+    const key = `rest:GET /api${path}`;
+    await resolve(new Request(`${API}${path}`), recipe(key, "empty"), createInventory(), {
+      ...options,
+      onUnmocked: (note) => unmocked.push(note),
+    });
+    expect(unmocked).toEqual([{ codec: "rest", key, ...told }]);
+  });
+
+  it.each([
+    ["a reshape", recipe("rest:GET /api/projects", "empty")],
+    ["a failure it writes", recipe("rest:GET /api/projects", "error")],
+    ["a call the recipe does not name", recipe("rest:GET /api/me", "empty")],
+    ["no recipe", undefined],
+  ])("says nothing of %s", async (_, active) => {
+    const unmocked: Unmocked[] = [];
+    await resolve(new Request(`${API}/projects`), active, createInventory(), {
+      ...options,
+      onUnmocked: (note) => unmocked.push(note),
+    });
+    expect(unmocked).toEqual([]);
   });
 
   it("reshapes a bare count", async () => {
