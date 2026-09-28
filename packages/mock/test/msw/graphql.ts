@@ -58,6 +58,8 @@ export interface GraphqlFake {
   readonly reached: readonly string[];
   /** Answers the operation on `field` with `data: null` and an error until reset. */
   fail(field: string): void;
+  /** Answers `field` itself as null beside an error, as a nullable field that threw does. */
+  failPartly(field: string): void;
   /** Forgets every persisted query and every failure. */
   reset(): void;
 }
@@ -70,6 +72,7 @@ interface Params {
 export function createGraphqlFake(manifest: Readonly<Record<string, string>> = {}): GraphqlFake {
   const reached: string[] = [];
   const failing = new Set<string>();
+  const partly = new Set<string>();
   const persisted = new Map<string, string>();
 
   function answer(request: Request, params: Params): Response {
@@ -81,10 +84,11 @@ export function createGraphqlFake(manifest: Readonly<Record<string, string>> = {
     if (params.id !== undefined) persisted.set(params.id, text);
     const field = /\{\s*(\w+)/.exec(text)?.[1] ?? "";
     reached.push(`${request.method} ${field}`);
-    if (failing.has(field)) {
-      const errors = [{ message: "boom", extensions: { code: "INTERNAL_SERVER_ERROR" } }];
-      return respond(request, { data: null, errors }, 200);
-    }
+    const errors = [
+      { message: "boom", path: [field], extensions: { code: "INTERNAL_SERVER_ERROR" } },
+    ];
+    if (failing.has(field)) return respond(request, { data: null, errors }, 200);
+    if (partly.has(field)) return respond(request, { data: { [field]: null }, errors }, 200);
     const data = ROOTS[field];
     if (data === undefined) {
       return respond(request, { errors: [{ message: `Cannot query field "${field}"` }] }, 400);
@@ -114,9 +118,11 @@ export function createGraphqlFake(manifest: Readonly<Record<string, string>> = {
     handlers,
     reached,
     fail: (field) => failing.add(field),
+    failPartly: (field) => partly.add(field),
     reset() {
       reached.length = 0;
       failing.clear();
+      partly.clear();
       persisted.clear();
     },
   };

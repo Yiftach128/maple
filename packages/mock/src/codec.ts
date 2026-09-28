@@ -29,6 +29,8 @@ export type Answer =
       readonly status: number;
       readonly body: unknown;
       readonly meta?: TypeMeta;
+      /** The server answered in part, with errors beside it: reshaped, never recorded. */
+      readonly partial?: boolean;
     }
   | {
       readonly kind: "failure";

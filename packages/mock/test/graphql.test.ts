@@ -36,7 +36,7 @@ const JSON_TYPE = { "content-type": "application/json" };
 const EMPTY = { projects: { items: [], total: 0 } };
 const FAILED = {
   data: null,
-  errors: [{ message: "boom", extensions: { code: "INTERNAL_SERVER_ERROR" } }],
+  errors: [{ message: "boom", path: ["projects"], extensions: { code: "INTERNAL_SERVER_ERROR" } }],
 };
 
 function post(body: unknown, headers: Record<string, string> = {}, url = GRAPHQL): Request {
@@ -168,9 +168,9 @@ describe("graphqlCodec.read", () => {
   it.each([
     ["data", Response.json({ data: ME }), { kind: "data", status: 200, body: ME }],
     [
-      "data beside errors",
+      "data beside errors as partial",
       Response.json({ data: { me: null }, errors: [{ message: "x" }] }),
-      { kind: "data", status: 200, body: { me: null } },
+      { kind: "data", status: 200, body: { me: null }, partial: true },
     ],
     [
       "data in the GraphQL response type",
@@ -319,6 +319,16 @@ describe("graphqlCodec against a GraphQL server", () => {
     await expect(response?.json()).resolves.toEqual({
       errors: [{ message: 'Cannot query field "nothing"' }],
     });
+  });
+
+  it("reshapes a partial result, but keeps the last whole one as the sample", async () => {
+    const inventory = createInventory();
+    await run(post({ query: QUERIES.projects }), recipe("graphql:Projects", "one"), inventory);
+    fake.failPartly("projects");
+    const request = post({ query: QUERIES.projects });
+    const response = await run(request, recipe("graphql:Projects", "empty"), inventory);
+    await expect(response?.json()).resolves.toEqual({ data: { projects: null } });
+    expect(inventory.sample("graphql:Projects", "/p")?.body).toEqual(PROJECTS);
   });
 
   it("reshapes the last recorded answer when the server fails", async () => {

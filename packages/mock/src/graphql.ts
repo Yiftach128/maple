@@ -102,8 +102,8 @@ function persistedHash(extensions: unknown): string | undefined {
 }
 
 /**
- * A response with `data` is one answer, the data alone. Without it, the response
- * is an error the page handles, read at the server's status, or as 500 when it said 2xx.
+ * A response with `data` is one answer, the data alone, partial beside `errors`.
+ * Without it, it is an error read at the server's status, or 500 for a 2xx.
  */
 async function read(response: Response): Promise<readonly Answer[] | undefined> {
   if (!isJson(response.headers.get("content-type"))) return undefined;
@@ -112,7 +112,8 @@ async function read(response: Response): Promise<readonly Answer[] | undefined> 
   if (!isRecord(envelope)) return undefined;
   const data = envelope["data"];
   if (data !== undefined && data !== null) {
-    return [{ kind: "data", status: response.status, body: data }];
+    const partial = Array.isArray(envelope["errors"]) && envelope["errors"].length > 0;
+    return [{ kind: "data", status: response.status, body: data, ...(partial ? { partial } : {}) }];
   }
   return [{ kind: "data", status: response.ok ? 500 : response.status, body: envelope }];
 }

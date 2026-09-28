@@ -199,7 +199,7 @@ function withIdentity(answer: Answer, layer: IdentityLayer): Answer {
   return isData(answer) ? { ...answer, body: impose(answer.body, layer.as, layer.rules) } : answer;
 }
 
-/** Records every real 2xx answer. A mocked one is never recorded. */
+/** Records every real, whole 2xx answer. A mocked or partial one is never recorded. */
 export function record(
   inventory: Inventory,
   calls: readonly Call[],
@@ -209,7 +209,7 @@ export function record(
   const at = (options.now ?? Date.now)();
   calls.forEach((call, index) => {
     const answer = answers?.[index];
-    if (!isData(answer)) return;
+    if (!isData(answer) || answer.partial === true) return;
     const { body, meta, status } = answer;
     inventory.record(options.route, { key: call.key, status, body, at, ...(meta ? { meta } : {}) });
   });
