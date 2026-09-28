@@ -98,6 +98,28 @@ describe("installMock, in a real browser", () => {
     expect(graphql.reached).toEqual(["POST projects", "POST projects"]);
   });
 
+  it("says at debug why a named call kept the server's answer", async () => {
+    const sink = memorySink();
+    install(recipe(["rest:GET /api/page", "empty"]), {
+      logger: createLogger({ sinks: [sink], level: "debug" }),
+    });
+    await (await fetch(`${API}/page`)).text();
+
+    expect(sink.records.map(({ level, message, fields }) => ({ level, message, fields }))).toEqual([
+      {
+        level: "debug",
+        message: "A call went through unmocked: its codec could not read the response.",
+        fields: {
+          codec: "rest",
+          key: "rest:GET /api/page",
+          reason: "unreadable",
+          status: 200,
+          path: "/api/page",
+        },
+      },
+    ]);
+  });
+
   it.each([
     ["long", (items: { name: string }[]) => items.every((item) => item.name.length >= 32)],
     ["sparse", (items: { name: string }[]) => items.length === PROJECTS.items.length],
