@@ -18,8 +18,11 @@ import type { GraphqlParams } from "@maple-kit/core/mock";
 
 /** How the codec finds GraphQL requests and names the persisted ones. */
 export interface GraphqlCodecOptions {
-  /** The path the GraphQL handler is mounted at. Defaults to `/graphql`. */
-  readonly endpoint?: string;
+  /**
+   * Where the GraphQL handler is mounted, one path or several. Defaults to
+   * `/graphql` and `/api/graphql`, where a Next app mounts it.
+   */
+  readonly endpoint?: string | readonly string[];
   /**
    * The host's persisted documents, id to text, as graphql-codegen's
    * `persistedDocuments` writes them: a persisted request is then named by its operation.
@@ -29,30 +32,42 @@ export interface GraphqlCodecOptions {
 
 const GRAPHQL_RESPONSE = "application/graphql-response+json";
 
+const ENDPOINTS = ["/graphql", "/api/graphql"];
+
 const FAILURES = {
   error: { message: "Internal Server Error", code: "INTERNAL_SERVER_ERROR" },
   forbidden: { message: "Forbidden", code: "FORBIDDEN" },
 } as const;
 
-/** A GraphQL codec. Put it before the REST codec, which claims everything. */
+/**
+ * A GraphQL codec. Put it before the REST codec, which claims everything. It
+ * owns every request at its endpoints: one it cannot name, a batch or a body
+ * that is not JSON, has no call in it and passes through, never reaching REST.
+ */
 export function graphqlCodec(options: GraphqlCodecOptions = {}): Codec {
-  const endpoint = (options.endpoint ?? "/graphql").replace(/\/$/, "");
+  const endpoints = new Set([options.endpoint ?? ENDPOINTS].flat().map(trimSlash));
   const manifest = new Map(Object.entries(options.manifest ?? {}));
 
   async function split(request: Request): Promise<Call[] | undefined> {
-    if (new URL(request.url).pathname.replace(/\/$/, "") !== endpoint) return undefined;
+    if (!endpoints.has(trimSlash(new URL(request.url).pathname))) return undefined;
     const params = await paramsOf(request);
-    if (params === undefined) return undefined;
-    const persisted = params.query ? undefined : manifest.get(params.documentId ?? "");
-    const operation = readGraphqlOperation(
-      persisted === undefined ? params : { ...params, query: persisted },
-    );
-    if (operation === undefined) return undefined;
+    const operation = params && readGraphqlOperation(withText(params, manifest));
+    if (operation === undefined) return [];
     const { key, type } = operation;
     return [{ key, ...(type === undefined ? {} : { mutates: type === "mutation" }) }];
   }
 
   return { name: "graphql", split, read, join };
+}
+
+function trimSlash(path: string): string {
+  return path.replace(/\/$/, "");
+}
+
+/** A persisted request's text, from the manifest, when it carries none of its own. */
+function withText(params: GraphqlParams, manifest: ReadonlyMap<string, string>): GraphqlParams {
+  const text = params.query ? undefined : manifest.get(params.documentId ?? "");
+  return text === undefined ? params : { ...params, query: text };
 }
 
 /** The request parameters, from the query string or the JSON body. A batch is not read. */

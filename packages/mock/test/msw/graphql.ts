@@ -14,6 +14,8 @@ import type { RequestHandler } from "msw";
 
 export const ORIGIN = "https://preview.example";
 export const GRAPHQL = `${ORIGIN}/graphql`;
+/** Where a Next app mounts the same handler. */
+export const API_GRAPHQL = `${ORIGIN}/api/graphql`;
 export const GRAPHQL_RESPONSE = "application/graphql-response+json";
 
 export const PROJECTS = {
@@ -90,8 +92,8 @@ export function createGraphqlFake(manifest: Readonly<Record<string, string>> = {
     return respond(request, { data }, 200);
   }
 
-  const handlers: RequestHandler[] = [
-    http.get(GRAPHQL, ({ request }) => {
+  const handlers: RequestHandler[] = [GRAPHQL, API_GRAPHQL].flatMap((endpoint) => [
+    http.get(endpoint, ({ request }) => {
       const search = new URL(request.url).searchParams;
       const extensions = parse(search.get("extensions"));
       return answer(request, {
@@ -99,14 +101,14 @@ export function createGraphqlFake(manifest: Readonly<Record<string, string>> = {
         ...optional("id", search.get("documentId") ?? hashOf(extensions)),
       });
     }),
-    http.post(GRAPHQL, async ({ request }) => {
+    http.post(endpoint, async ({ request }) => {
       const body = (await request.json()) as Record<string, unknown>;
       return answer(request, {
         ...optional("query", body["query"] as string | undefined),
         ...optional("id", (body["documentId"] as string | undefined) ?? hashOf(body["extensions"])),
       });
     }),
-  ];
+  ]);
 
   return {
     handlers,

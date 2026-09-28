@@ -41,7 +41,10 @@ export interface Codec {
   readonly name: string;
   /** The request as it is sent on when its response will be rewritten. */
   prepare?(request: Request): Request;
-  /** The calls `request` carries, or undefined when this codec does not own it. */
+  /**
+   * The calls `request` carries, or undefined when this codec does not own it.
+   * A request it owns with no call it can name is `[]`, and passes through.
+   */
   split(request: Request): Promise<readonly Call[] | undefined>;
   /** A real response as one answer per call, or undefined when it cannot be read. */
   read(response: Response, calls: readonly Call[]): Promise<readonly Answer[] | undefined>;

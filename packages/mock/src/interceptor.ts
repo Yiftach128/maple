@@ -43,7 +43,7 @@ export interface InstallOptions {
   readonly logger?: Logger;
   /** The tab's storage. Defaults to `sessionStorage` when there is one. */
   readonly storage?: Storage;
-  /** Tried in order. Defaults to tRPC at `/api/trpc`, GraphQL at `/graphql`, then REST. */
+  /** Tried in order. Defaults to tRPC at `/api/trpc`, GraphQL at `/graphql` and `/api/graphql`, then REST. */
   readonly codecs?: readonly Codec[];
   /** The real `fetch` a mocked request is forwarded through. */
   readonly fetch?: typeof fetch;

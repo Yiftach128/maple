@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { API, createApiFake, ME, PROJECTS, SESSION } from "./msw/api.js";
 import { handlerFetch } from "./msw/fetch.js";
+import { API_GRAPHQL, createGraphqlFake, GRAPHQL, QUERIES } from "./msw/graphql.js";
 import { RULES } from "./msw/identity.js";
 import { createLaunchDarklyFake, LD_BASE, LD_ENV } from "./msw/launchdarkly.js";
 
@@ -14,6 +15,7 @@ import type { MockState, Recipe } from "@maple-kit/core/mock";
 import type { MockHandle } from "@maple-kit/mock";
 
 const api = createApiFake();
+const graphql = createGraphqlFake();
 const nativeFetch = globalThis.fetch;
 const page = location.href;
 let handle: MockHandle | undefined;
@@ -40,7 +42,7 @@ function xhr(method: string, url: string): Promise<XMLHttpRequest> {
 }
 
 beforeEach(() => {
-  globalThis.fetch = handlerFetch(api.handlers);
+  globalThis.fetch = handlerFetch([...api.handlers, ...graphql.handlers]);
   sessionStorage.clear();
 });
 
@@ -51,6 +53,7 @@ afterEach(() => {
   history.replaceState(null, "", page);
   document.cookie = `${RECIPE_COOKIE}=; Max-Age=0; Path=/`;
   api.reset();
+  graphql.reset();
 });
 
 describe("installMock, in a real browser", () => {
@@ -75,6 +78,24 @@ describe("installMock, in a real browser", () => {
     expect(JSON.parse(projects.responseText)).toMatchObject({ items: [PROJECTS.items[0]] });
     expect(me.status).toBe(403);
     expect(api.reached).toEqual(["GET /api/projects"]);
+  });
+
+  it("reads GraphQL at both of its endpoints before REST, by default", async () => {
+    install(recipe(["graphql:Projects", "empty"], ["rest:GET /api/projects", "one"]));
+    const query = (url: string) =>
+      fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ query: QUERIES.projects }),
+      });
+
+    const empty = { data: { projects: { items: [], total: 0 } } };
+    await expect((await query(GRAPHQL)).json()).resolves.toEqual(empty);
+    await expect((await query(API_GRAPHQL)).json()).resolves.toEqual(empty);
+    const projects: unknown = await (await fetch(`${API}/projects`)).json();
+
+    expect(projects).toMatchObject({ items: [PROJECTS.items[0]] });
+    expect(graphql.reached).toEqual(["POST projects", "POST projects"]);
   });
 
   it.each([
