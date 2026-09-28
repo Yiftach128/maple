@@ -36,8 +36,8 @@ export const QUERIES = {
   create: "mutation CreateProject($name: String!) { createProject(name: $name) { id name } }",
 };
 
-/** What Apollo's persisted-query link would send for `QUERIES.projects`. */
-export const PROJECTS_HASH = "5d41402abc4b2a76b9719d911017c592a1b2c3d4e5f60718293a4b5c6d7e8f90";
+/** The sha256 of `QUERIES.projects`, as APQ sends it. The fake refuses a hash that is not its text's. */
+export const PROJECTS_HASH = "174dd2ef4c9300e7d79b2cbb4d2c73228c3bd15b4916b7ab0f5cb335f8203bac";
 
 const ROOTS: Readonly<Record<string, unknown>> = {
   projects: PROJECTS,
@@ -51,10 +51,20 @@ export const NOT_FOUND = {
   ],
 };
 
+/** Apollo Server's answer, at 400, to an APQ hash that is not its text's. */
+export const MISMATCH = {
+  errors: [
+    {
+      message: "provided sha does not match query",
+      extensions: { code: "INTERNAL_SERVER_ERROR" },
+    },
+  ],
+};
+
 /** A fake GraphQL server, plus what it was asked. */
 export interface GraphqlFake {
   readonly handlers: RequestHandler[];
-  /** `METHOD field` of every operation that reached it, or `METHOD #id` for a miss. */
+  /** `METHOD field` of every operation that reached it, or `METHOD #id` for a miss or a refused hash. */
   readonly reached: readonly string[];
   /** Answers the operation on `field` with `data: null` and an error until reset. */
   fail(field: string): void;
@@ -67,6 +77,8 @@ export interface GraphqlFake {
 interface Params {
   readonly query?: string;
   readonly id?: string;
+  /** APQ's hash, which the text, when sent, must match. */
+  readonly apq?: string;
 }
 
 export function createGraphqlFake(manifest: Readonly<Record<string, string>> = {}): GraphqlFake {
@@ -74,6 +86,15 @@ export function createGraphqlFake(manifest: Readonly<Record<string, string>> = {
   const failing = new Set<string>();
   const partly = new Set<string>();
   const persisted = new Map<string, string>();
+
+  async function checked(request: Request, params: Params): Promise<Response> {
+    const { apq, query } = params;
+    if (apq !== undefined && query !== undefined && (await sha256(query)) !== apq) {
+      reached.push(`${request.method} #${apq}`);
+      return respond(request, MISMATCH, 400);
+    }
+    return answer(request, params);
+  }
 
   function answer(request: Request, params: Params): Response {
     const text = params.query ?? persisted.get(params.id ?? "") ?? manifest[params.id ?? ""];
@@ -91,7 +112,9 @@ export function createGraphqlFake(manifest: Readonly<Record<string, string>> = {
     if (partly.has(field)) return respond(request, { data: { [field]: null }, errors }, 200);
     const data = ROOTS[field];
     if (data === undefined) {
-      return respond(request, { errors: [{ message: `Cannot query field "${field}"` }] }, 400);
+      const message = `Cannot query field "${field}" on type "Query".`;
+      const invalid = { errors: [{ message, extensions: { code: "GRAPHQL_VALIDATION_FAILED" } }] };
+      return respond(request, invalid, 400);
     }
     return respond(request, { data }, 200);
   }
@@ -99,17 +122,20 @@ export function createGraphqlFake(manifest: Readonly<Record<string, string>> = {
   const handlers: RequestHandler[] = [GRAPHQL, API_GRAPHQL].flatMap((endpoint) => [
     http.get(endpoint, ({ request }) => {
       const search = new URL(request.url).searchParams;
-      const extensions = parse(search.get("extensions"));
-      return answer(request, {
+      const apq = hashOf(parse(search.get("extensions")));
+      return checked(request, {
         ...optional("query", search.get("query") ?? undefined),
-        ...optional("id", search.get("documentId") ?? hashOf(extensions)),
+        ...optional("id", search.get("documentId") ?? apq),
+        ...optional("apq", apq),
       });
     }),
     http.post(endpoint, async ({ request }) => {
       const body = (await request.json()) as Record<string, unknown>;
-      return answer(request, {
+      const apq = hashOf(body["extensions"]);
+      return checked(request, {
         ...optional("query", body["query"] as string | undefined),
-        ...optional("id", (body["documentId"] as string | undefined) ?? hashOf(body["extensions"])),
+        ...optional("id", (body["documentId"] as string | undefined) ?? apq),
+        ...optional("apq", apq),
       });
     }),
   ]);
@@ -136,6 +162,11 @@ function respond(request: Request, body: unknown, status: number): Response {
     status,
     headers: { "content-type": type, "x-trace": "t1" },
   });
+}
+
+async function sha256(text: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 function hashOf(extensions: unknown): string | undefined {

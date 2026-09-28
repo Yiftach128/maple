@@ -6,6 +6,7 @@ import {
   GRAPHQL,
   GRAPHQL_RESPONSE,
   ME,
+  MISMATCH,
   NOT_FOUND,
   ORIGIN,
   PROJECTS,
@@ -293,6 +294,13 @@ describe("graphqlCodec against a GraphQL server", () => {
     expect(fake.reached).toEqual([]);
   });
 
+  it("answers a failure nothing was fetched for as JSON, whatever the page accepts", async () => {
+    const accept = { accept: `${GRAPHQL_RESPONSE}, application/json;q=0.9` };
+    const request = post({ query: QUERIES.create, variables: { name: "x" } }, accept);
+    const response = await run(request, recipe("graphql:CreateProject", "error"));
+    expect(response?.headers.get("content-type")).toBe("application/json");
+  });
+
   it("answers in the type the page asked for", async () => {
     const accept = { accept: `${GRAPHQL_RESPONSE}, application/json;q=0.9` };
     const request = post({ query: QUERIES.projects }, accept);
@@ -317,7 +325,12 @@ describe("graphqlCodec against a GraphQL server", () => {
     const response = await run(request, recipe(call?.key ?? "", "empty"));
     expect(response?.status).toBe(400);
     await expect(response?.json()).resolves.toEqual({
-      errors: [{ message: 'Cannot query field "nothing"' }],
+      errors: [
+        {
+          message: 'Cannot query field "nothing" on type "Query".',
+          extensions: { code: "GRAPHQL_VALIDATION_FAILED" },
+        },
+      ],
     });
   });
 
@@ -392,6 +405,25 @@ describe("graphqlCodec against a GraphQL server", () => {
     expect(writes).toEqual(expected);
   });
 
+  it.each([
+    ["without a manifest, as a write, by its method", graphqlCodec(), [`graphql:${PROJECTS_HASH}`]],
+    [
+      "with one, as the query it is",
+      graphqlCodec({ manifest: { [PROJECTS_HASH]: QUERIES.projects } }),
+      [],
+    ],
+  ])("reports a persisted query sent by POST under `as` %s", async (_, persisted, expected) => {
+    const writes: string[] = [];
+    const active: Recipe = { version: 2, calls: [], as: { role: "barista" } };
+    await resolve(post({ extensions: APQ }), active, createInventory(), {
+      ...options,
+      codecs: [persisted, restCodec],
+      identity: RULES,
+      onWrite: (key) => writes.push(key),
+    });
+    expect(writes).toEqual(expected);
+  });
+
   describe("under APQ", () => {
     const miss = () => post({ operationName: "Projects", extensions: APQ });
     const retry = () =>
@@ -421,6 +453,14 @@ describe("graphqlCodec against a GraphQL server", () => {
       fake.reset();
       const response = await run(miss(), active, inventory);
       await expect(response?.json()).resolves.toEqual({ data: EMPTY });
+      expect(fake.reached).toEqual([`POST #${PROJECTS_HASH}`]);
+    });
+
+    it("sends a hash that is not its text's back as the server refused it", async () => {
+      const request = post({ operationName: "Projects", query: QUERIES.me, extensions: APQ });
+      const response = await run(request, recipe("graphql:Projects", "empty"));
+      expect(response?.status).toBe(400);
+      await expect(response?.json()).resolves.toEqual(MISMATCH);
       expect(fake.reached).toEqual([`POST #${PROJECTS_HASH}`]);
     });
 
