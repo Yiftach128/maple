@@ -280,8 +280,10 @@ page gets the fields it asked for and nothing else. A response without
 never recorded, and it goes back as it came, at the server's own status. That
 is how APQ keeps working under a mock: the first request misses, the page
 retries with the text, and both are the same call. Once the call has been
-recorded, a miss is answered from its sample and the page never retries. The
-`errors` beside a partial result are not carried into a rewritten answer.
+recorded, a miss is answered from its sample and the page never retries. A
+partial result, `data` beside `errors`, is reshaped like any other, without
+its `errors`, but never recorded: a later failure falls back to the last whole
+answer, not to a field the server could not resolve.
 
 **A failure is written as a GraphQL server writes one**: `data: null` beside
 one error whose `extensions.code` is `INTERNAL_SERVER_ERROR` or `FORBIDDEN`,
