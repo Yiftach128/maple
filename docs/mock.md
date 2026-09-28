@@ -296,7 +296,9 @@ path in every client. The content type mirrors the server's,
 **A mutation is a write, whatever its method.** Every GraphQL request is a
 `POST`, so the call says whether it writes and the report of a write reaching
 the server under `as` believes that over the method. A persisted request
-without a manifest says nothing, and its method decides.
+without a manifest says nothing, and its method decides, so under `as` a
+persisted query sent by `POST` is reported as a write. A `manifest` names it,
+and the report stops.
 
 ## Transforms
 
