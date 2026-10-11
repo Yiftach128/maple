@@ -25,6 +25,7 @@ import type {
   ListQuery,
   MediaConnector,
 } from "../connectors/types.js";
+import type { UpstreamError } from "../errors.js";
 import type { Logger } from "../logger/types.js";
 import type { CommentStore } from "../store.js";
 import type {
@@ -647,10 +648,29 @@ function failure(logger: Logger | undefined, error: unknown): Response {
   if (error instanceof MapleStoreError && error.reason === "unavailable") {
     return json({ error: "The store could not be reached" }, 503);
   }
+  const refusal = error instanceof MapleStoreError ? upstreamRefusal(error.upstream) : undefined;
+  if (refusal) return json({ error: refusal }, 502);
   if (error instanceof MapleStoreError || error instanceof RangeError) {
     return json({ error: "The request was not valid for this store" }, 400);
   }
   return json({ error: "Something went wrong" }, 500);
+}
+
+/**
+ * What a client is told when the backend refused Maple's own call. A 401, 403
+ * or 404 on a path Maple built is its credentials or configuration, not input.
+ */
+function upstreamRefusal(upstream: UpstreamError | undefined): string | undefined {
+  if (!upstream) return undefined;
+  const { service, status, detail } = upstream;
+  const note = detail.slice(0, 200);
+  if (status === 401 || status === 403) {
+    return `${service} refused the request (${String(status)}): ${note}`;
+  }
+  if (status === 404) {
+    return `${service} could not find the repository or pull request (404): ${note}`;
+  }
+  return undefined;
 }
 
 function json(body: unknown, status: number): Response {

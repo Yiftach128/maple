@@ -9,6 +9,7 @@
  * ledger — and news reposts it rather than editing it. `docs/connectors.md`.
  */
 
+import { UpstreamError } from "../errors.js";
 import { exportMarkdown, parseFence } from "../export/markdown.js";
 import { USER_AGENT } from "../internal/user-agent.js";
 import { findPull } from "./github-pull.js";
@@ -134,7 +135,7 @@ function createClient(options: GitHubStoreOptions): Client {
  * GitHub's message, not ours. Core maps this to `MapleStoreError` and decides
  * what to retry; swallowing it here would take that decision away.
  */
-async function failure(response: Response, path: string): Promise<Error> {
+async function failure(response: Response, path: string): Promise<UpstreamError> {
   const detail = await response.text().catch(() => "");
   const parsed: unknown = detail ? safeJson(detail) : undefined;
   const message =
@@ -142,7 +143,7 @@ async function failure(response: Response, path: string): Promise<Error> {
       ? String(parsed.message)
       : detail || response.statusText;
 
-  return new Error(`GitHub ${String(response.status)} on ${path}: ${message}`);
+  return new UpstreamError("GitHub", response.status, message, path);
 }
 
 function safeJson(text: string): unknown {

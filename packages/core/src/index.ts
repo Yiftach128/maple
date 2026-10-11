@@ -56,7 +56,7 @@ export {
   supports,
   UnknownPillarError,
 } from "./connectors/index.js";
-export { MapleStoreError } from "./errors.js";
+export { MapleStoreError, UpstreamError } from "./errors.js";
 export { BLOCKING_STATUSES, decideGate, publishGate } from "./gate/index.js";
 export type { GateContext, GateOptions } from "./gate/index.js";
 export { CyclicValueError, stableStringify } from "./lib/stable-stringify.js";
