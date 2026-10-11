@@ -165,6 +165,43 @@ describe("writing a comment", () => {
     expect(stored.author.provenance).toBe("server");
   });
 
+  it("refuses a comment from an identity named like Maple's own advisory author", async () => {
+    const store = createCommentStore(memoryStore());
+    const lintLike: IdentityConnector = {
+      name: "lint-like",
+      resolveUser: () => Promise.resolve({ id: "maple-lint", name: "Reviewer" }),
+    };
+    const response = await handler({ store, identity: lintLike })(
+      request("POST", "/api/maple/comments", sampleComment({ branch: "main" })),
+    );
+    expect(response.status).toBe(403);
+    expect((await store.list({ branch: "main" })).comments).toHaveLength(0);
+  });
+
+  it.each([
+    { name: "the default list", advisoryAuthors: undefined, id: "maple-lint", status: 403 },
+    { name: "a custom list", advisoryAuthors: ["design-bot"], id: "design-bot", status: 403 },
+    {
+      name: "a custom list, default id",
+      advisoryAuthors: ["design-bot"],
+      id: "maple-lint",
+      status: 201,
+    },
+    { name: "an empty list", advisoryAuthors: [], id: "maple-lint", status: 201 },
+  ])("gates posting as an advisory author by $name", async ({ advisoryAuthors, id, status }) => {
+    const store = createCommentStore(memoryStore());
+    const identity: IdentityConnector = {
+      name: "table",
+      resolveUser: () => Promise.resolve({ id, name: "Reviewer" }),
+    };
+    const response = await handler({
+      store,
+      identity,
+      ...(advisoryAuthors === undefined ? {} : { advisoryAuthors }),
+    })(request("POST", "/api/maple/comments", sampleComment({ branch: "main" })));
+    expect(response.status).toBe(status);
+  });
+
   it("drops a resolution posted with a new comment, which cannot arrive resolved", async () => {
     const store = createCommentStore(memoryStore());
     const draft = {

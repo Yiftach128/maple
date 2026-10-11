@@ -9,6 +9,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
+import { isAdvisory } from "@maple-kit/core";
 import { resolveLocalPlace } from "@maple-kit/core/local";
 
 import { branchFromEnvironment, storeFromEnvironment } from "./config.js";
@@ -53,9 +54,11 @@ async function openLocally(
   return openOn(storeFromEnvironment({ ...env, MAPLE_STORE: "file" }, cwd), branch);
 }
 
-function openOn(store: CommentStore, branch: string): Promise<readonly Comment[]> {
-  return createToolHandlers({ store }).listComments({
+/** Lint pins are advisory, as in the gate, so they never hold an agent. */
+async function openOn(store: CommentStore, branch: string): Promise<readonly Comment[]> {
+  const open = await createToolHandlers({ store }).listComments({
     branch,
     statuses: ["open", "needs_reverify"],
   });
+  return open.filter((comment) => !isAdvisory(comment));
 }

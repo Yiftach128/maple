@@ -38,6 +38,8 @@ export interface HandlerOptions {
   readonly refresh?: GateRefresh;
   /** True when the gate is held until somebody approves the preview. */
   readonly requireApproval?: boolean;
+  /** Must match `RouteOptions.advisoryAuthors`. Defaults to `ADVISORY_AUTHORS`. */
+  readonly advisoryAuthors?: readonly string[];
   /** Where a failed publish is reported. Silent when absent. */
   readonly logger?: Logger;
   /**
@@ -206,6 +208,9 @@ async function report(options: HandlerOptions, branch: string): Promise<void> {
       ...(options.requireApproval === undefined
         ? {}
         : { requireApproval: options.requireApproval }),
+      ...(options.advisoryAuthors === undefined
+        ? {}
+        : { advisoryAuthors: options.advisoryAuthors }),
     },
     branch,
   );

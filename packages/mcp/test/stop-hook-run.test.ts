@@ -141,3 +141,17 @@ describe("the Stop hook with a forge configured", () => {
     await expect(run(stop(plainDir()), FORGE)).rejects.toThrow(/MAPLE_BRANCH/);
   });
 });
+
+describe("advisory authors", () => {
+  it("does not hold an agent on a lint pin, and still holds it on a human comment", async () => {
+    const cwd = repo();
+    const store = createCommentStore(fileStore({ cwd }));
+    const lint = { id: "maple-lint", name: "Maple lint", provenance: "server" } as const;
+    await store.append(sampleComment({ branch: "feat/x", author: lint }));
+
+    expect((await run(stop(cwd))).decision).not.toBe("block");
+
+    await store.append(sampleComment({ branch: "feat/x" }));
+    expect((await run(stop(cwd))).decision).toBe("block");
+  });
+});

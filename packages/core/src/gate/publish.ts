@@ -49,6 +49,8 @@ export interface GateContext {
    * `docs/gate.md` covers why that is off by default.
    */
   readonly requireApproval?: boolean;
+  /** Author ids that inform the gate without holding it. See {@link GateOptions}. */
+  readonly advisoryAuthors?: readonly string[];
 }
 
 /** What was published, and on which commit. */
@@ -74,6 +76,7 @@ export async function publishVerdict(
     statusTracked: context.store.capabilities.setStatus,
     commit: sha,
     ...(context.requireApproval === undefined ? {} : { requireApproval: context.requireApproval }),
+    ...(context.advisoryAuthors === undefined ? {} : { advisoryAuthors: context.advisoryAuthors }),
     ...(approvals === undefined ? {} : { approvals }),
   });
 

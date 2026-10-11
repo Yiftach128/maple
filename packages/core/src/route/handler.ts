@@ -8,6 +8,7 @@
  */
 
 import { MapleStoreError } from "../errors.js";
+import { isAdvisoryId } from "../gate/decide.js";
 import { publishGate } from "../gate/publish.js";
 import { fnv1a32 } from "../lib/fnv1a.js";
 import { handleApprovals } from "./approvals.js";
@@ -100,6 +101,11 @@ export interface RouteOptions {
    * store that keeps approvals and an identity to name who left one.
    */
   readonly requireApproval?: boolean;
+  /**
+   * Author ids whose comments inform the gate without holding it, and which
+   * no identity may post as. Defaults to `ADVISORY_AUTHORS`; `[]` lets all hold.
+   */
+  readonly advisoryAuthors?: readonly string[];
   /**
    * Maple Mock's `/mock/schema`, `/mock/plan` and `/mock/identity`, for a
    * preview that asked. Absent, or with `preview` false, each answers 404.
@@ -224,6 +230,9 @@ async function refresh(mount: Mount, request: Request): Promise<Response> {
       ...(options.requireApproval === undefined
         ? {}
         : { requireApproval: options.requireApproval }),
+      ...(options.advisoryAuthors === undefined
+        ? {}
+        : { advisoryAuthors: options.advisoryAuthors }),
     },
     request,
   );
@@ -405,6 +414,9 @@ async function appendComment(
   if (!drafts.every(isDraft)) return json({ error: "A branch and a body are required" }, 400);
 
   const user = await options.identity?.resolveUser(identityRequest(request));
+  if (user && isAdvisoryId(user.id, options.advisoryAuthors)) {
+    return json({ error: "This identity is reserved for Maple's own comments" }, 403);
+  }
   const author = user ? authorFor(user) : GUEST;
   const comments: NewComment[] = drafts.map((draft) => ({
     ...withoutResolution(draft),
@@ -484,6 +496,7 @@ async function reportGate(
     gate,
     ...(options.logger === undefined ? {} : { logger: options.logger }),
     ...(options.requireApproval === undefined ? {} : { requireApproval: options.requireApproval }),
+    ...(options.advisoryAuthors === undefined ? {} : { advisoryAuthors: options.advisoryAuthors }),
   };
   await publishGate(context, branch, new URL(request.url).origin);
 }

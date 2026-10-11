@@ -63,6 +63,19 @@ much re-checking a team wants is a team's decision.
 decideGate(comments, { commit: sha, reverifyResolved: true });
 ```
 
+**Advisory authors** are listed but never hold the gate. `decideGate` ignores
+comments whose `author.id` is in `advisoryAuthors`, which defaults to
+`ADVISORY_AUTHORS` (`["maple-lint"]`, the design-lint author). They count toward
+neither `open` nor `total`, so a lint-only surface still needs an approval where
+one is required. The MCP Stop hook ignores them too. Lint holds a merge through
+`maple/design-lint` and its severity, not through this check. `advisoryAuthors:
+[]` makes every author count. Set it
+once on `RouteOptions.advisoryAuthors` (and on the MCP server's options) and the
+route, the published check and the agent's resolve all use it. The comment route
+answers 403 "This identity is reserved for Maple's own comments" when the
+identity resolver returns a user whose `id` is in that list, so nobody can post
+as an advisory author to dodge the gate; give that user a different `id`.
+
 **`orphaned` is written by nothing at all, and that is a real hole.** The
 overlay works out that an anchor no longer resolves — `resolveAnchor` is called
 on every render and the marks depend on it — and never reports it to the store.

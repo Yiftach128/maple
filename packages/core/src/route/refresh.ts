@@ -44,6 +44,7 @@ export interface RefreshContext {
   /** The route's own store, for a refresh with no `store` of its own. */
   fallbackStore(): Promise<CommentStore | null>;
   readonly requireApproval?: boolean;
+  readonly advisoryAuthors?: readonly string[];
   readonly logger?: Logger;
 }
 
@@ -92,6 +93,7 @@ async function publish(
     ...chosen,
     ...(context.logger === undefined ? {} : { logger: context.logger }),
     ...(context.requireApproval === undefined ? {} : { requireApproval: context.requireApproval }),
+    ...(context.advisoryAuthors === undefined ? {} : { advisoryAuthors: context.advisoryAuthors }),
   };
 
   const published = await publishVerdict(gateContext, branch, reviewUrl);

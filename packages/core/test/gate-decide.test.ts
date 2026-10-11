@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { BLOCKING_STATUSES, decideGate } from "../src/gate/decide.js";
+import { ADVISORY_AUTHORS, BLOCKING_STATUSES, decideGate } from "../src/gate/decide.js";
 import { storedComment } from "../src/testing/fixtures.js";
 
-import type { Approval, CommentStatus, GateReason } from "../src/types.js";
+import type { Approval, Comment, CommentStatus, GateReason } from "../src/types.js";
 
 function at(status: CommentStatus, body = "Fix the spacing") {
   return storedComment({ id: `c_${status}`, status, body });
@@ -254,5 +254,90 @@ describe("a comment resolved against a commit that has moved on", () => {
   it("does nothing at all when nothing names the commit under judgement", () => {
     const verdict = decideGate([resolvedAt("older11")], { reverifyResolved: true });
     expect(verdict.conclusion).toBe("clear");
+  });
+});
+
+describe("advisory authors", () => {
+  const lint = (status: CommentStatus) =>
+    storedComment({
+      id: `lint_${status}`,
+      status,
+      author: { id: "maple-lint", name: "Maple lint", provenance: "server" },
+    });
+
+  interface Case {
+    name: string;
+    comments: Comment[];
+    advisoryAuthors?: readonly string[];
+    expected: [conclusion: string, open: number, total: number];
+  }
+
+  it.each<Case>([
+    { name: "an open lint pin, by default", comments: [lint("open")], expected: ["clear", 0, 0] },
+    {
+      name: "an open lint pin, with none advisory",
+      comments: [lint("open")],
+      advisoryAuthors: [],
+      expected: ["blocked", 1, 1],
+    },
+    {
+      name: "a lint pin beside an open human comment",
+      comments: [lint("open"), at("open")],
+      expected: ["blocked", 1, 1],
+    },
+    {
+      name: "a lint pin beside a resolved human comment",
+      comments: [lint("open"), at("resolved")],
+      expected: ["clear", 0, 1],
+    },
+    {
+      name: "orphaned and stale lint pins",
+      comments: [lint("orphaned"), lint("needs_reverify")],
+      expected: ["clear", 0, 0],
+    },
+    {
+      name: "a custom advisory author",
+      comments: [at("open")],
+      advisoryAuthors: ["u_1"],
+      expected: ["clear", 0, 0],
+    },
+    {
+      name: "a lint pin when only another author is advisory",
+      comments: [lint("open")],
+      advisoryAuthors: ["u_1"],
+      expected: ["blocked", 1, 1],
+    },
+    {
+      name: "a guest and a client who chose the id maple-lint",
+      comments: (["guest", "client"] as const).map((provenance) =>
+        storedComment({
+          id: `spoof_${provenance}`,
+          author: { id: "maple-lint", name: "Reviewer", provenance },
+        }),
+      ),
+      expected: ["blocked", 2, 2],
+    },
+  ])("$name", ({ comments, advisoryAuthors, expected }) => {
+    const verdict = decideGate(comments, advisoryAuthors === undefined ? {} : { advisoryAuthors });
+    expect([verdict.conclusion, verdict.open, verdict.total]).toEqual(expected);
+  });
+
+  it("makes the lint author advisory by default", () => {
+    expect(ADVISORY_AUTHORS).toEqual(["maple-lint"]);
+  });
+
+  it("leaves a lint-only surface awaiting approval, not approved by it", () => {
+    const verdict = decideGate([lint("resolved")], {
+      requireApproval: true,
+      approvals: [],
+      commit: COMMIT,
+    });
+    expect(verdict.reason).toBe("awaiting-approval");
+  });
+
+  it("numbers a blocking comment as the table does, lint pins included", () => {
+    const verdict = decideGate([lint("open"), at("open", "Wrong colour")]);
+    expect(verdict.summary).toContain("2. ");
+    expect(verdict.summary).not.toContain("1. ");
   });
 });

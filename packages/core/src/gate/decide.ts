@@ -13,6 +13,33 @@ import type { Approval, Comment, CommentStatus, GateVerdict } from "../types.js"
 /** Statuses that hold the gate. Everything but `resolved`, by default. */
 export const BLOCKING_STATUSES: readonly CommentStatus[] = ["open", "needs_reverify", "orphaned"];
 
+/**
+ * Author ids whose comments inform a review without holding it: design-lint
+ * pins, which `maple/design-lint` already gates by severity. Exported so the
+ * lint author's id and the gate's default read one definition.
+ */
+export const ADVISORY_AUTHORS: readonly string[] = ["maple-lint"];
+
+/**
+ * True when `id` is an advisory author. The one place the default list is
+ * applied: `undefined` means {@link ADVISORY_AUTHORS}, `[]` means nobody.
+ */
+export function isAdvisoryId(
+  id: string,
+  advisoryAuthors: readonly string[] = ADVISORY_AUTHORS,
+): boolean {
+  return advisoryAuthors.includes(id);
+}
+
+/**
+ * True for a comment the gate ignores: its author is advisory and server
+ * provenance. The route refuses to post as an advisory id, so a reviewer
+ * cannot take the exemption by choosing an identity.
+ */
+export function isAdvisory(comment: Comment, advisoryAuthors?: readonly string[]): boolean {
+  return comment.author.provenance === "server" && isAdvisoryId(comment.author.id, advisoryAuthors);
+}
+
 /** How the verdict is reached. */
 export interface GateOptions {
   /**
@@ -47,6 +74,11 @@ export interface GateOptions {
    * Nothing else ever writes that status, so this is what makes it reachable.
    */
   readonly reverifyResolved?: boolean;
+  /**
+   * Author ids whose comments are listed but never block or count.
+   * Defaults to {@link ADVISORY_AUTHORS}; `[]` lets every author hold.
+   */
+  readonly advisoryAuthors?: readonly string[];
 }
 
 /**
@@ -79,7 +111,8 @@ export function decideGate(
   if (cannotTell) return cannotTell;
 
   const blockOn = options.blockOn ?? BLOCKING_STATUSES;
-  const all = (comments ?? []).map((comment) => reverified(comment, options));
+  const listed = (comments ?? []).map((comment) => reverified(comment, options));
+  const all = listed.filter((comment) => !isAdvisory(comment, options.advisoryAuthors));
   const blocking = all.filter((comment) => blockOn.includes(comment.status));
   const counts = { open: blocking.length, total: all.length };
 
@@ -89,7 +122,7 @@ export function decideGate(
       conclusion: "blocked",
       reason: "comments-open",
       title: `${String(blocking.length)} of ${String(all.length)} ${plural(all.length)} still open`,
-      summary: listing(all, blocking),
+      summary: listing(listed, blocking),
     };
   }
 
